@@ -30,5 +30,9 @@ public class Transaction implements Serializable {
     private String description;
 
     @ManyToOne
+    @JoinColumn(name = "client_id")
+    private Client client;
+
+    @ManyToOne
     private Compte compte;
 }

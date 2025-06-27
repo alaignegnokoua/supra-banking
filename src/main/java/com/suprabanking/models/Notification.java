@@ -23,6 +23,9 @@ public class Notification implements Serializable {
     @Column(name = "date_envoi")
     private LocalDateTime dateEnvoi;
 
+    @Column(name ="statut")
+    private String statut;
+
     @ManyToOne
     private Client client;
 }

@@ -18,8 +18,8 @@ public class Compte implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "numero", unique = true)
-    private String numero;
+    @Column(unique = true, nullable = false)
+    private String numeroCompte;
 
     @Column(name = "type")
     private String type; // courant, épargne, etc.

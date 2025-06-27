@@ -16,6 +16,9 @@ public class ProduitFinancier implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "code_produit", unique = true)
+    private String codeProduit;
+
     @Column(name = "type")
     private String type; // prêt, dépôt à terme...
 

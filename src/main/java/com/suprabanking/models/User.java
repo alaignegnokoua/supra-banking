@@ -24,6 +24,9 @@ public class User implements Serializable {
     @Column(name = "mot_de_passe", nullable = false)
     private String motDePasse;
 
+    @Column(nullable = false, unique = true)
+    private String email;
+
     @Column(name = "enabled")
     private boolean enabled = true;
 

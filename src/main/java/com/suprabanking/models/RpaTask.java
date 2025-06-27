@@ -25,4 +25,11 @@ public class RpaTask implements Serializable {
 
     @Column(name = "date_execution")
     private LocalDateTime dateExecution;
+
+    @Column(name = "type")
+    private String type;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
 }

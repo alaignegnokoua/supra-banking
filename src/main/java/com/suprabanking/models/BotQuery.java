@@ -20,11 +20,17 @@ public class BotQuery implements Serializable {
     @Column(name = "question")
     private String question;
 
+    @Column(name = "etat")
+    private String etat;
+
     @Column(name = "reponse")
     private String reponse;
 
     @Column(name = "date_interaction")
     private LocalDateTime dateInteraction;
+
+    @ManyToOne
+    private User user;
 
     @ManyToOne
     private Client client;
