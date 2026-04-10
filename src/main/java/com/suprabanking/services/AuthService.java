@@ -6,6 +6,7 @@ import com.suprabanking.models.User;
 import com.suprabanking.repositories.RoleRepository;
 import com.suprabanking.repositories.UserRepository;
 import com.suprabanking.services.dto.auth.AuthResponse;
+import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
 import com.suprabanking.web.errors.ResourceNotFoundException;
@@ -67,6 +68,19 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         return buildAuthResponse(user);
+    }
+
+    public CurrentUserResponse getCurrentUser(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        return CurrentUserResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(user.getRoles().stream().map(Role::getNom).toList())
+                .build();
     }
 
     private AuthResponse buildAuthResponse(User user) {

@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.AuthService;
 import com.suprabanking.services.dto.auth.AuthResponse;
+import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
 import jakarta.validation.Valid;
@@ -13,6 +14,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+
+import java.security.Principal;
 
 @RestController
 @Slf4j
@@ -32,5 +36,10 @@ public class AuthResource {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         log.debug("REST request to login user: {}", request.getUsername());
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<CurrentUserResponse> me(Principal principal) {
+        return ResponseEntity.ok(authService.getCurrentUser(principal.getName()));
     }
 }

@@ -28,12 +28,21 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("ADMIN", "AGENT")
-                        .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("ADMIN", "AGENT")
-                        .requestMatchers(HttpMethod.PATCH, "/api/**").hasAnyRole("ADMIN", "AGENT")
-                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+
+                .requestMatchers(HttpMethod.GET, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.POST, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PUT, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PATCH, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.DELETE, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
+
+                .requestMatchers(HttpMethod.GET, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT", "CLIENT")
+                .requestMatchers(HttpMethod.POST, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PUT, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PATCH, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.DELETE, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT")
+
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
