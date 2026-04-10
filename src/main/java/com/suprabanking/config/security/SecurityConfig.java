@@ -43,6 +43,24 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.DELETE, "/api/produits-financiers/**").hasAnyRole("ADMIN", "AGENT")
 
+                        .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.POST, "/api/clients/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.PATCH, "/api/clients/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasAnyRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/api/comptes/**").hasAnyRole("ADMIN", "AGENT", "CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/comptes/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/comptes/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.PATCH, "/api/comptes/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.DELETE, "/api/comptes/**").hasAnyRole("ADMIN", "AGENT")
+
+                        .requestMatchers(HttpMethod.GET, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT", "CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.PATCH, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.DELETE, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT")
+
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
