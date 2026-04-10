@@ -20,4 +20,10 @@ public class CurrentUserResponse {
     private String email;
     private boolean enabled;
     private List<String> roles;
+
+    private Long clientId;
+    private String clientNom;
+    private String clientPrenom;
+    private String clientEmail;
+    private String clientTelephone;
 }

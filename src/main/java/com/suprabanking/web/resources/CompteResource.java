@@ -40,6 +40,20 @@ public class CompteResource {
         return compteService.findAllComptes(pageable);
     }
 
+    @GetMapping("/me")
+    public Page<CompteDTO> getMyComptes(Pageable pageable) {
+        log.debug("REST request to get current client Comptes");
+        return compteService.findMyComptes(pageable);
+    }
+
+    @GetMapping("/me/{id}")
+    public ResponseEntity<CompteDTO> getMyCompteById(@PathVariable Long id) {
+        log.debug("REST request to get current client Compte by id : {}", id);
+        return compteService.findMyOne(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PutMapping("/{id}")
     public CompteDTO update(@PathVariable Long id, @Valid @RequestBody CompteDTO dto) {
         log.debug("REST request to update Compte : {}", dto);

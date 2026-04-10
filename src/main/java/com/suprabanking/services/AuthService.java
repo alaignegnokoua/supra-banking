@@ -87,12 +87,19 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
+        Client client = user.getClient();
+
         return CurrentUserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .enabled(user.isEnabled())
                 .roles(user.getRoles().stream().map(Role::getNom).toList())
+            .clientId(client != null ? client.getId() : null)
+            .clientNom(client != null ? client.getNom() : null)
+            .clientPrenom(client != null ? client.getPrenom() : null)
+            .clientEmail(client != null ? client.getEmail() : null)
+            .clientTelephone(client != null ? client.getTelephone() : null)
                 .build();
     }
 

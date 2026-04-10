@@ -87,11 +87,17 @@ public class CompteServiceImpl implements CompteService {
         log.debug("Request to get all Comptes");
 
         if (currentUserService.isCurrentUserClient()) {
-            Long clientId = currentUserService.requireCurrentClientId();
-            return compteRepository.findByClient_Id(clientId, pageable).map(compteMapper::toDto);
+            return findMyComptes(pageable);
         }
 
         return compteRepository.findAll(pageable).map(compteMapper::toDto);
+    }
+
+    @Override
+    public Page<CompteDTO> findMyComptes(Pageable pageable) {
+        log.debug("Request to get current client Comptes");
+        Long clientId = currentUserService.requireCurrentClientId();
+        return compteRepository.findByClient_Id(clientId, pageable).map(compteMapper::toDto);
     }
 
     @Override
@@ -101,12 +107,18 @@ public class CompteServiceImpl implements CompteService {
                 .orElseThrow(() -> new ResourceNotFoundException("Compte not found with id=" + id));
 
         if (currentUserService.isCurrentUserClient()) {
-            Long clientId = currentUserService.requireCurrentClientId();
-            if (compte.getClient() == null || !clientId.equals(compte.getClient().getId())) {
-                throw new AccessDeniedException("Accès refusé à ce compte");
-            }
+            assertOwnershipForCurrentClient(compte);
         }
 
+        return Optional.of(compteMapper.toDto(compte));
+    }
+
+    @Override
+    public Optional<CompteDTO> findMyOne(Long id) {
+        log.debug("Request to get current client Compte : {}", id);
+        Compte compte = compteRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Compte not found with id=" + id));
+        assertOwnershipForCurrentClient(compte);
         return Optional.of(compteMapper.toDto(compte));
     }
 
@@ -114,5 +126,12 @@ public class CompteServiceImpl implements CompteService {
     public void delete(Long id) {
         log.debug("Request to delete Compte : {}", id);
         compteRepository.deleteById(id);
+    }
+
+    private void assertOwnershipForCurrentClient(Compte compte) {
+        Long clientId = currentUserService.requireCurrentClientId();
+        if (compte.getClient() == null || !clientId.equals(compte.getClient().getId())) {
+            throw new AccessDeniedException("Accès refusé à ce compte");
+        }
     }
 }

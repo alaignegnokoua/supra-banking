@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -80,6 +81,56 @@ class SecurityIntegrationTests {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
+
+        @Test
+        void currentUserEndpointShouldReturnClientProfileFields() throws Exception {
+        String token = registerAndGetToken("clientProfile", "clientProfile@test.local", "Secret123!");
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.username").value("clientProfile"))
+            .andExpect(jsonPath("$.clientId").isNumber())
+            .andExpect(jsonPath("$.clientEmail").value("clientProfile@test.local"));
+        }
+
+        @Test
+        void clientShouldBeForbiddenWhenReadingAnotherClientCompteById() throws Exception {
+        String tokenUser1 = registerAndGetToken("clientOwn1", "clientOwn1@test.local", "Secret123!");
+        registerAndGetToken("clientOwn2", "clientOwn2@test.local", "Secret123!");
+
+        User user1 = userRepository.findByUsername("clientOwn1").orElseThrow();
+        User user2 = userRepository.findByUsername("clientOwn2").orElseThrow();
+
+        Compte compteUser1 = new Compte();
+        compteUser1.setNumeroCompte("ACC-OWN-1");
+        compteUser1.setType("courant");
+        compteUser1.setSolde(1000.0);
+        compteUser1.setDateCreation(LocalDateTime.now());
+        compteUser1.setClient(user1.getClient());
+        compteRepository.save(compteUser1);
+
+        Compte compteUser2 = new Compte();
+        compteUser2.setNumeroCompte("ACC-OWN-2");
+        compteUser2.setType("epargne");
+        compteUser2.setSolde(2500.0);
+        compteUser2.setDateCreation(LocalDateTime.now());
+        compteUser2.setClient(user2.getClient());
+        compteUser2 = compteRepository.save(compteUser2);
+
+        mockMvc.perform(get("/api/comptes/" + compteUser2.getId())
+                .header("Authorization", "Bearer " + tokenUser1))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/comptes/me/" + compteUser2.getId())
+                .header("Authorization", "Bearer " + tokenUser1))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/comptes/me/" + compteUser1.getId())
+                .header("Authorization", "Bearer " + tokenUser1))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("ACC-OWN-1")));
+        }
 
     private String registerAndGetToken(String username, String email, String password) throws Exception {
         String payload = """

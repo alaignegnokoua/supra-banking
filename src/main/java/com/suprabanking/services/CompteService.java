@@ -16,7 +16,11 @@ public interface CompteService {
 
     Page<CompteDTO> findAllComptes(Pageable pageable);
 
+    Page<CompteDTO> findMyComptes(Pageable pageable);
+
     Optional<CompteDTO> findOne(Long id);
+
+    Optional<CompteDTO> findMyOne(Long id);
 
     void delete(Long id);
 }
