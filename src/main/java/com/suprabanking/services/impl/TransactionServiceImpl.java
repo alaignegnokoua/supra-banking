@@ -9,6 +9,7 @@ import com.suprabanking.repositories.CompteRepository;
 import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.mapper.TransactionMapper;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -112,6 +114,65 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    @Transactional
+    public void effectuerVirementInterne(VirementInterneRequest request) {
+        log.debug("Request to process internal transfer: {}", request);
+
+        if (request.getCompteSourceId().equals(request.getCompteDestinationId())) {
+            throw new IllegalArgumentException("Le compte source et le compte destination doivent être différents");
+        }
+
+        Long clientId = currentUserService.requireCurrentClientId();
+
+        Compte compteSource = compteRepository.findById(request.getCompteSourceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Compte source introuvable"));
+
+        Compte compteDestination = compteRepository.findById(request.getCompteDestinationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Compte destination introuvable"));
+
+        if (compteSource.getClient() == null || !clientId.equals(compteSource.getClient().getId())
+                || compteDestination.getClient() == null || !clientId.equals(compteDestination.getClient().getId())) {
+            throw new AccessDeniedException("Accès refusé à l'un des comptes");
+        }
+
+        if (compteSource.getSolde() == null || compteSource.getSolde() < request.getMontant()) {
+            throw new IllegalArgumentException("Solde insuffisant pour effectuer ce virement");
+        }
+
+        compteSource.setSolde(compteSource.getSolde() - request.getMontant());
+        compteDestination.setSolde(compteDestination.getSolde() + request.getMontant());
+
+        compteRepository.save(compteSource);
+        compteRepository.save(compteDestination);
+
+        String descriptionBase = (request.getDescription() == null || request.getDescription().isBlank())
+                ? "Virement interne"
+                : request.getDescription().trim();
+
+        LocalDateTime now = LocalDateTime.now();
+        Client client = compteSource.getClient();
+
+        Transaction debit = new Transaction();
+        debit.setType("virement");
+        debit.setMontant(request.getMontant());
+        debit.setDateTransaction(now);
+        debit.setDescription(descriptionBase + " - débit vers " + compteDestination.getNumeroCompte());
+        debit.setClient(client);
+        debit.setCompte(compteSource);
+
+        Transaction credit = new Transaction();
+        credit.setType("virement");
+        credit.setMontant(request.getMontant());
+        credit.setDateTransaction(now);
+        credit.setDescription(descriptionBase + " - crédit depuis " + compteSource.getNumeroCompte());
+        credit.setClient(client);
+        credit.setCompte(compteDestination);
+
+        transactionRepository.save(debit);
+        transactionRepository.save(credit);
+    }
+
+    @Override
     public Page<TransactionDTO> findAllTransactions(Pageable pageable) {
         log.debug("Request to get all Transactions");
 
@@ -123,8 +184,8 @@ public class TransactionServiceImpl implements TransactionService {
         return transactionRepository.findAll(pageable).map(transactionMapper::toDto);
     }
 
-        @Override
-        public Page<TransactionDTO> findMyTransactionsByCompte(
+    @Override
+    public Page<TransactionDTO> findMyTransactionsByCompte(
             Long compteId,
             String type,
             LocalDateTime dateFrom,
@@ -132,7 +193,7 @@ public class TransactionServiceImpl implements TransactionService {
             Double montantMin,
             Double montantMax,
             Pageable pageable
-        ) {
+    ) {
         log.debug("Request to get current client transactions by compte {}, filters type={}, from={}, to={}, min={}, max={}",
             compteId, type, dateFrom, dateTo, montantMin, montantMax);
 
@@ -146,16 +207,16 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         return transactionRepository.findMyTransactionsByCompteWithFilters(
-            clientId,
-            compteId,
-            type,
-            dateFrom,
-            dateTo,
-            montantMin,
-            montantMax,
-            pageable
+                clientId,
+                compteId,
+                type,
+                dateFrom,
+                dateTo,
+                montantMin,
+                montantMax,
+                pageable
         ).map(transactionMapper::toDto);
-        }
+    }
 
     @Override
     public Optional<TransactionDTO> findOne(Long id) {

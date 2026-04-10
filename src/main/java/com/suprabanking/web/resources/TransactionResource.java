@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementInterneRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,13 @@ public class TransactionResource {
     public TransactionDTO save(@Valid @RequestBody TransactionDTO dto) {
         log.debug("REST request to save Transaction : {}", dto);
         return transactionService.saveTransaction(dto);
+    }
+
+    @PostMapping("/me/virement-interne")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void effectuerVirementInterne(@Valid @RequestBody VirementInterneRequest request) {
+        log.debug("REST request to process internal transfer: {}", request);
+        transactionService.effectuerVirementInterne(request);
     }
 
     @GetMapping("/{id}")

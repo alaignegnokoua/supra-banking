@@ -202,6 +202,97 @@ class SecurityIntegrationTests {
             .andExpect(status().isForbidden());
         }
 
+        @Test
+        void clientShouldProcessInternalTransferBetweenOwnAccounts() throws Exception {
+        String token = registerAndGetToken("clientTransferOk", "clientTransferOk@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientTransferOk").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("TR-SRC-1");
+        source.setType("courant");
+        source.setSolde(1200.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Compte destination = new Compte();
+        destination.setNumeroCompte("TR-DST-1");
+        destination.setType("epargne");
+        destination.setSolde(300.0);
+        destination.setDateCreation(LocalDateTime.now());
+        destination.setClient(user.getClient());
+        destination = compteRepository.save(destination);
+
+        String payload = """
+            {
+              "compteSourceId": %d,
+              "compteDestinationId": %d,
+              "montant": 250,
+              "description": "Transfert test"
+            }
+            """.formatted(source.getId(), destination.getId());
+
+        mockMvc.perform(post("/api/transactions/me/virement-interne")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isNoContent());
+
+        Compte sourceUpdated = compteRepository.findById(source.getId()).orElseThrow();
+        Compte destinationUpdated = compteRepository.findById(destination.getId()).orElseThrow();
+
+        org.junit.jupiter.api.Assertions.assertEquals(950.0, sourceUpdated.getSolde());
+        org.junit.jupiter.api.Assertions.assertEquals(550.0, destinationUpdated.getSolde());
+
+        mockMvc.perform(get("/api/transactions/me/compte/" + source.getId())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("débit vers TR-DST-1")));
+
+        mockMvc.perform(get("/api/transactions/me/compte/" + destination.getId())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("crédit depuis TR-SRC-1")));
+        }
+
+        @Test
+        void clientShouldNotProcessInternalTransferWhenBalanceIsInsufficient() throws Exception {
+        String token = registerAndGetToken("clientTransferKo", "clientTransferKo@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientTransferKo").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("TR-SRC-2");
+        source.setType("courant");
+        source.setSolde(100.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Compte destination = new Compte();
+        destination.setNumeroCompte("TR-DST-2");
+        destination.setType("epargne");
+        destination.setSolde(50.0);
+        destination.setDateCreation(LocalDateTime.now());
+        destination.setClient(user.getClient());
+        destination = compteRepository.save(destination);
+
+        String payload = """
+            {
+              "compteSourceId": %d,
+              "compteDestinationId": %d,
+              "montant": 500,
+              "description": "Transfert impossible"
+            }
+            """.formatted(source.getId(), destination.getId());
+
+        mockMvc.perform(post("/api/transactions/me/virement-interne")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(containsString("Solde insuffisant")));
+        }
+
     private String registerAndGetToken(String username, String email, String password) throws Exception {
         String payload = """
                 {

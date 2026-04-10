@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementInterneRequest;
 
 public interface TransactionService {
 
@@ -16,9 +17,11 @@ public interface TransactionService {
 
     TransactionDTO partialUpdateTransaction(TransactionDTO transactionDTO, Long id);
 
+    void effectuerVirementInterne(VirementInterneRequest request);
+
     Page<TransactionDTO> findAllTransactions(Pageable pageable);
 
-        Page<TransactionDTO> findMyTransactionsByCompte(
+    Page<TransactionDTO> findMyTransactionsByCompte(
             Long compteId,
             String type,
             LocalDateTime dateFrom,
@@ -26,7 +29,7 @@ public interface TransactionService {
             Double montantMin,
             Double montantMax,
             Pageable pageable
-        );
+    );
 
     Optional<TransactionDTO> findOne(Long id);
 
