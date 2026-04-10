@@ -1,5 +1,6 @@
 package com.suprabanking.services.impl;
 
+import com.suprabanking.config.security.CurrentUserService;
 import com.suprabanking.models.Client;
 import com.suprabanking.models.Compte;
 import com.suprabanking.models.Transaction;
@@ -28,6 +29,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final CompteRepository compteRepository;
     private final ClientRepository clientRepository;
     private final TransactionMapper transactionMapper;
+    private final CurrentUserService currentUserService;
 
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
@@ -111,12 +113,24 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public Page<TransactionDTO> findAllTransactions(Pageable pageable) {
         log.debug("Request to get all Transactions");
+
+        if (currentUserService.isCurrentUserClient()) {
+            Long clientId = currentUserService.requireCurrentClientId();
+            return transactionRepository.findByClient_Id(clientId, pageable).map(transactionMapper::toDto);
+        }
+
         return transactionRepository.findAll(pageable).map(transactionMapper::toDto);
     }
 
     @Override
     public Optional<TransactionDTO> findOne(Long id) {
         log.debug("Request to get Transaction : {}", id);
+        if (currentUserService.isCurrentUserClient()) {
+            Long clientId = currentUserService.requireCurrentClientId();
+            return transactionRepository.findByIdAndClient_Id(id, clientId)
+                    .map(transactionMapper::toDto);
+        }
+
         return transactionRepository.findById(id).map(transactionMapper::toDto);
     }
 

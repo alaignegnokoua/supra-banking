@@ -1,5 +1,6 @@
 package com.suprabanking.services.impl;
 
+import com.suprabanking.config.security.CurrentUserService;
 import com.suprabanking.models.Client;
 import com.suprabanking.models.Compte;
 import com.suprabanking.repositories.ClientRepository;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -25,6 +27,7 @@ public class CompteServiceImpl implements CompteService {
     private final CompteRepository compteRepository;
     private final ClientRepository clientRepository;
     private final CompteMapper compteMapper;
+    private final CurrentUserService currentUserService;
 
     @Override
     public CompteDTO saveCompte(CompteDTO dto) {
@@ -82,13 +85,29 @@ public class CompteServiceImpl implements CompteService {
     @Override
     public Page<CompteDTO> findAllComptes(Pageable pageable) {
         log.debug("Request to get all Comptes");
+
+        if (currentUserService.isCurrentUserClient()) {
+            Long clientId = currentUserService.requireCurrentClientId();
+            return compteRepository.findByClient_Id(clientId, pageable).map(compteMapper::toDto);
+        }
+
         return compteRepository.findAll(pageable).map(compteMapper::toDto);
     }
 
     @Override
     public Optional<CompteDTO> findOne(Long id) {
         log.debug("Request to get Compte : {}", id);
-        return compteRepository.findById(id).map(compteMapper::toDto);
+        Compte compte = compteRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Compte not found with id=" + id));
+
+        if (currentUserService.isCurrentUserClient()) {
+            Long clientId = currentUserService.requireCurrentClientId();
+            if (compte.getClient() == null || !clientId.equals(compte.getClient().getId())) {
+                throw new AccessDeniedException("Accès refusé à ce compte");
+            }
+        }
+
+        return Optional.of(compteMapper.toDto(compte));
     }
 
     @Override

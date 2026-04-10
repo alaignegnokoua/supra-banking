@@ -1,5 +1,6 @@
 package com.suprabanking.services.impl;
 
+import com.suprabanking.config.security.CurrentUserService;
 import com.suprabanking.models.Client;
 import com.suprabanking.models.ProduitFinancier;
 import com.suprabanking.repositories.ClientRepository;
@@ -10,6 +11,7 @@ import com.suprabanking.services.mapper.ProduitFinancierMapper;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,6 +25,7 @@ public class ProduitFinancierServiceImpl implements ProduitFinancierService {
     private final ProduitFinancierRepository produitFinancierRepository;
     private final ClientRepository clientRepository;
     private final ProduitFinancierMapper produitFinancierMapper;
+    private final CurrentUserService currentUserService;
 
     @Override
     public ProduitFinancierDTO saveProduitFinancier(ProduitFinancierDTO dto) {
@@ -78,6 +81,15 @@ public class ProduitFinancierServiceImpl implements ProduitFinancierService {
     @Override
     public List<ProduitFinancierDTO> findAllProduitFinanciers() {
         log.debug("Request to get all ProduitFinanciers");
+
+        if (currentUserService.isCurrentUserClient()) {
+            Long clientId = currentUserService.requireCurrentClientId();
+            return produitFinancierRepository.findByClient_Id(clientId)
+                    .stream()
+                    .map(produitFinancierMapper::toDto)
+                    .toList();
+        }
+
         return produitFinancierRepository.findAll()
                 .stream()
                 .map(produitFinancierMapper::toDto)
@@ -87,8 +99,17 @@ public class ProduitFinancierServiceImpl implements ProduitFinancierService {
     @Override
     public Optional<ProduitFinancierDTO> findOne(Long id) {
         log.debug("Request to get ProduitFinancier : {}", id);
-        return produitFinancierRepository.findById(id)
-                .map(produitFinancierMapper::toDto);
+        ProduitFinancier entity = produitFinancierRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitFinancier not found with id=" + id));
+
+        if (currentUserService.isCurrentUserClient()) {
+            Long clientId = currentUserService.requireCurrentClientId();
+            if (entity.getClient() == null || !clientId.equals(entity.getClient().getId())) {
+                throw new AccessDeniedException("Accès refusé à ce produit financier");
+            }
+        }
+
+        return Optional.of(produitFinancierMapper.toDto(entity));
     }
 
     @Override
