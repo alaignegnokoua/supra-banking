@@ -1,10 +1,12 @@
 package com.suprabanking.services;
 
-import com.suprabanking.services.dto.TransactionDTO;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.Optional;
+import com.suprabanking.services.dto.TransactionDTO;
 
 public interface TransactionService {
 
@@ -15,6 +17,16 @@ public interface TransactionService {
     TransactionDTO partialUpdateTransaction(TransactionDTO transactionDTO, Long id);
 
     Page<TransactionDTO> findAllTransactions(Pageable pageable);
+
+        Page<TransactionDTO> findMyTransactionsByCompte(
+            Long compteId,
+            String type,
+            LocalDateTime dateFrom,
+            LocalDateTime dateTo,
+            Double montantMin,
+            Double montantMax,
+            Pageable pageable
+        );
 
     Optional<TransactionDTO> findOne(Long id);
 

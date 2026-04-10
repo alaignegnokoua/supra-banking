@@ -3,8 +3,10 @@ package com.suprabanking;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suprabanking.models.Compte;
+import com.suprabanking.models.Transaction;
 import com.suprabanking.models.User;
 import com.suprabanking.repositories.CompteRepository;
+import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.repositories.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +43,9 @@ class SecurityIntegrationTests {
 
     @Autowired
     private CompteRepository compteRepository;
+
+    @Autowired
+    private TransactionRepository transactionRepository;
 
     @Test
     void clientShouldAuthenticateAndReadOnlyOwnComptes() throws Exception {
@@ -130,6 +135,71 @@ class SecurityIntegrationTests {
                 .header("Authorization", "Bearer " + tokenUser1))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("ACC-OWN-1")));
+        }
+
+        @Test
+        void clientShouldReadFilteredTransactionsOnlyOnOwnCompte() throws Exception {
+        String tokenUser1 = registerAndGetToken("clientTx1", "clientTx1@test.local", "Secret123!");
+        registerAndGetToken("clientTx2", "clientTx2@test.local", "Secret123!");
+
+        User user1 = userRepository.findByUsername("clientTx1").orElseThrow();
+        User user2 = userRepository.findByUsername("clientTx2").orElseThrow();
+
+        Compte compteUser1 = new Compte();
+        compteUser1.setNumeroCompte("TX-OWN-1");
+        compteUser1.setType("courant");
+        compteUser1.setSolde(5000.0);
+        compteUser1.setDateCreation(LocalDateTime.now());
+        compteUser1.setClient(user1.getClient());
+        compteUser1 = compteRepository.save(compteUser1);
+
+        Compte compteUser2 = new Compte();
+        compteUser2.setNumeroCompte("TX-OWN-2");
+        compteUser2.setType("epargne");
+        compteUser2.setSolde(8000.0);
+        compteUser2.setDateCreation(LocalDateTime.now());
+        compteUser2.setClient(user2.getClient());
+        compteUser2 = compteRepository.save(compteUser2);
+
+        Transaction txDepot = new Transaction();
+        txDepot.setType("depot");
+        txDepot.setMontant(1500.0);
+        txDepot.setDateTransaction(LocalDateTime.now().minusDays(1));
+        txDepot.setDescription("Depot salaire");
+        txDepot.setClient(user1.getClient());
+        txDepot.setCompte(compteUser1);
+        transactionRepository.save(txDepot);
+
+        Transaction txRetrait = new Transaction();
+        txRetrait.setType("retrait");
+        txRetrait.setMontant(200.0);
+        txRetrait.setDateTransaction(LocalDateTime.now().minusHours(8));
+        txRetrait.setDescription("Retrait DAB");
+        txRetrait.setClient(user1.getClient());
+        txRetrait.setCompte(compteUser1);
+        transactionRepository.save(txRetrait);
+
+        Transaction txOtherUser = new Transaction();
+        txOtherUser.setType("depot");
+        txOtherUser.setMontant(9999.0);
+        txOtherUser.setDateTransaction(LocalDateTime.now());
+        txOtherUser.setDescription("Autre client");
+        txOtherUser.setClient(user2.getClient());
+        txOtherUser.setCompte(compteUser2);
+        transactionRepository.save(txOtherUser);
+
+        mockMvc.perform(get("/api/transactions/me/compte/" + compteUser1.getId())
+                .queryParam("type", "depot")
+                .queryParam("montantMin", "1000")
+                .header("Authorization", "Bearer " + tokenUser1))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("Depot salaire")))
+            .andExpect(content().string(not(containsString("Retrait DAB"))))
+            .andExpect(content().string(not(containsString("Autre client"))));
+
+        mockMvc.perform(get("/api/transactions/me/compte/" + compteUser2.getId())
+                .header("Authorization", "Bearer " + tokenUser1))
+            .andExpect(status().isForbidden());
         }
 
     private String registerAndGetToken(String username, String email, String password) throws Exception {

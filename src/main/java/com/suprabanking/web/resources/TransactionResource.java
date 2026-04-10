@@ -7,9 +7,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 @RestController
 @Slf4j
@@ -38,6 +41,20 @@ public class TransactionResource {
     public Page<TransactionDTO> getAll(Pageable pageable) {
         log.debug("REST request to get all Transactions");
         return transactionService.findAllTransactions(pageable);
+    }
+
+    @GetMapping("/me/compte/{compteId}")
+    public Page<TransactionDTO> getMyTransactionsByCompte(
+            @PathVariable Long compteId,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false) Double montantMin,
+            @RequestParam(required = false) Double montantMax,
+            Pageable pageable
+    ) {
+        log.debug("REST request to get current client transactions by compte {}", compteId);
+        return transactionService.findMyTransactionsByCompte(compteId, type, dateFrom, dateTo, montantMin, montantMax, pageable);
     }
 
     @PutMapping("/{id}")

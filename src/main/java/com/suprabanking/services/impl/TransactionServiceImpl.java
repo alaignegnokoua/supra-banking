@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -121,6 +122,40 @@ public class TransactionServiceImpl implements TransactionService {
 
         return transactionRepository.findAll(pageable).map(transactionMapper::toDto);
     }
+
+        @Override
+        public Page<TransactionDTO> findMyTransactionsByCompte(
+            Long compteId,
+            String type,
+            LocalDateTime dateFrom,
+            LocalDateTime dateTo,
+            Double montantMin,
+            Double montantMax,
+            Pageable pageable
+        ) {
+        log.debug("Request to get current client transactions by compte {}, filters type={}, from={}, to={}, min={}, max={}",
+            compteId, type, dateFrom, dateTo, montantMin, montantMax);
+
+        Long clientId = currentUserService.requireCurrentClientId();
+
+        Compte compte = compteRepository.findById(compteId)
+            .orElseThrow(() -> new ResourceNotFoundException("Compte not found with id=" + compteId));
+
+        if (compte.getClient() == null || !clientId.equals(compte.getClient().getId())) {
+            throw new AccessDeniedException("Accès refusé à ce compte");
+        }
+
+        return transactionRepository.findMyTransactionsByCompteWithFilters(
+            clientId,
+            compteId,
+            type,
+            dateFrom,
+            dateTo,
+            montantMin,
+            montantMax,
+            pageable
+        ).map(transactionMapper::toDto);
+        }
 
     @Override
     public Optional<TransactionDTO> findOne(Long id) {
