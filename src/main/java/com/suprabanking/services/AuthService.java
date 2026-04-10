@@ -1,8 +1,10 @@
 package com.suprabanking.services;
 
 import com.suprabanking.config.security.JwtService;
+import com.suprabanking.models.Client;
 import com.suprabanking.models.Role;
 import com.suprabanking.models.User;
+import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.RoleRepository;
 import com.suprabanking.repositories.UserRepository;
 import com.suprabanking.services.dto.auth.AuthResponse;
@@ -28,6 +30,7 @@ import java.util.Set;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final ClientRepository clientRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -44,12 +47,22 @@ public class AuthService {
         Role clientRole = roleRepository.findByNom("ROLE_CLIENT")
                 .orElseThrow(() -> new ResourceNotFoundException("ROLE_CLIENT introuvable"));
 
+        Client client = new Client();
+        client.setNom(request.getUsername());
+        client.setPrenom("Client");
+        client.setEmail(request.getEmail());
+        client.setTelephone("N/A");
+        client.setIdentifiant(request.getUsername());
+        client.setMotDePasse(passwordEncoder.encode(request.getPassword()));
+        client = clientRepository.save(client);
+
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setMotDePasse(passwordEncoder.encode(request.getPassword()));
         user.setEnabled(true);
         user.setRoles(Set.of(clientRole));
+        user.setClient(client);
 
         User savedUser = userRepository.save(user);
         return buildAuthResponse(savedUser);
