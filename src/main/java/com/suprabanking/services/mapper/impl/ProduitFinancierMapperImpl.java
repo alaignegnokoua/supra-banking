@@ -29,6 +29,17 @@ public class ProduitFinancierMapperImpl implements ProduitFinancierMapper {
 
     @Override
     public void partialUpdate(ProduitFinancier entity, ProduitFinancierDTO dto) {
-        modelMapper.map(dto, entity);
+        if (dto.getCodeProduit() != null) {
+            entity.setCodeProduit(dto.getCodeProduit());
+        }
+        if (dto.getType() != null) {
+            entity.setType(dto.getType());
+        }
+        if (dto.getMontant() != null) {
+            entity.setMontant(dto.getMontant());
+        }
+        if (dto.getStatut() != null) {
+            entity.setStatut(dto.getStatut());
+        }
     }
 }

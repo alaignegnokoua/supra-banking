@@ -25,6 +25,14 @@ public class AmplitudeDataMapperImpl implements AmplitudeDataMapper {
 
     @Override
     public void partialUpdate(AmplitudeData entity, AmplitudeDataDTO dto) {
-        modelMapper.map(dto, entity);
+        if (dto.getCodeOperation() != null) {
+            entity.setCodeOperation(dto.getCodeOperation());
+        }
+        if (dto.getDonnees() != null) {
+            entity.setDonnees(dto.getDonnees());
+        }
+        if (dto.getDateSynchronisation() != null) {
+            entity.setDateSynchronisation(dto.getDateSynchronisation());
+        }
     }
 }

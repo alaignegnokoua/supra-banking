@@ -1,17 +1,19 @@
 package com.suprabanking.services.impl;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+
 import com.suprabanking.models.AmplitudeData;
 import com.suprabanking.repositories.AmplitudeDataRepository;
 import com.suprabanking.services.AmplitudeDataService;
 import com.suprabanking.services.dto.AmplitudeDataDTO;
 import com.suprabanking.services.mapper.AmplitudeDataMapper;
-import com.suprabanking.services.mapping.AmplitudeDataMapping;
+import com.suprabanking.web.errors.ResourceNotFoundException;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -33,9 +35,10 @@ public class AmplitudeDataServiceImpl implements AmplitudeDataService {
     public AmplitudeDataDTO updateAmplitudeData(AmplitudeDataDTO dto, Long id) {
         log.debug("Request to update AmplitudeData : {}", dto);
         AmplitudeData entity = amplitudeDataRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("AmplitudeData not found"));
-        dto.setId(id);
-        amplitudeDataMapper.partialUpdate(entity, dto);
+                .orElseThrow(() -> new ResourceNotFoundException("AmplitudeData not found with id=" + id));
+        entity.setCodeOperation(dto.getCodeOperation());
+        entity.setDonnees(dto.getDonnees());
+        entity.setDateSynchronisation(dto.getDateSynchronisation());
         entity = amplitudeDataRepository.save(entity);
         return amplitudeDataMapper.toDto(entity);
     }
@@ -48,7 +51,7 @@ public class AmplitudeDataServiceImpl implements AmplitudeDataService {
                     amplitudeDataMapper.partialUpdate(existing, dto);
                     return amplitudeDataMapper.toDto(amplitudeDataRepository.save(existing));
                 })
-                .orElseThrow(() -> new IllegalArgumentException("AmplitudeData not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("AmplitudeData not found with id=" + id));
     }
 
     @Override

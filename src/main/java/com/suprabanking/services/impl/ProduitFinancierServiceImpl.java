@@ -7,7 +7,7 @@ import com.suprabanking.repositories.ProduitFinancierRepository;
 import com.suprabanking.services.ProduitFinancierService;
 import com.suprabanking.services.dto.ProduitFinancierDTO;
 import com.suprabanking.services.mapper.ProduitFinancierMapper;
-import com.suprabanking.services.mapping.ProduitFinancierMapping;
+import com.suprabanking.web.errors.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,7 +31,7 @@ public class ProduitFinancierServiceImpl implements ProduitFinancierService {
 
         if(dto.getClientId() != null){
             Client client = clientRepository.findById(dto.getClientId())
-                    .orElseThrow(() -> new IllegalArgumentException("Client not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Client not found with id=" + dto.getClientId()));
             entity.setClient(client);
         }
 
@@ -43,9 +43,18 @@ public class ProduitFinancierServiceImpl implements ProduitFinancierService {
     public ProduitFinancierDTO updateProduitFinancier(ProduitFinancierDTO dto, Long id) {
         log.debug("Request to update ProduitFinancier : {}", dto);
         ProduitFinancier entity = produitFinancierRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("ProduitFinancier not found"));
-        dto.setId(id);
-        produitFinancierMapper.partialUpdate(entity, dto);
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitFinancier not found with id=" + id));
+        entity.setCodeProduit(dto.getCodeProduit());
+        entity.setType(dto.getType());
+        entity.setMontant(dto.getMontant());
+        entity.setStatut(dto.getStatut());
+        if (dto.getClientId() != null) {
+            Client client = clientRepository.findById(dto.getClientId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Client not found with id=" + dto.getClientId()));
+            entity.setClient(client);
+        } else {
+            entity.setClient(null);
+        }
         entity = produitFinancierRepository.save(entity);
         return produitFinancierMapper.toDto(entity);
     }
@@ -56,9 +65,14 @@ public class ProduitFinancierServiceImpl implements ProduitFinancierService {
         return produitFinancierRepository.findById(id)
                 .map(existing -> {
                     produitFinancierMapper.partialUpdate(existing, dto);
+                    if (dto.getClientId() != null) {
+                        Client client = clientRepository.findById(dto.getClientId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id=" + dto.getClientId()));
+                        existing.setClient(client);
+                    }
                     return produitFinancierMapper.toDto(produitFinancierRepository.save(existing));
                 })
-                .orElseThrow(() -> new IllegalArgumentException("ProduitFinancier not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ProduitFinancier not found with id=" + id));
     }
 
     @Override
