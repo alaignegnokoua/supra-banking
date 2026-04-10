@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.ProduitFinancierService;
 import com.suprabanking.services.dto.ProduitFinancierDTO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,7 +22,7 @@ public class ProduitFinancierResource {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ProduitFinancierDTO save(@RequestBody ProduitFinancierDTO dto) {
+    public ProduitFinancierDTO save(@Valid @RequestBody ProduitFinancierDTO dto) {
         log.debug("REST request to save ProduitFinancier : {}", dto);
         return produitFinancierService.saveProduitFinancier(dto);
     }
@@ -42,7 +43,7 @@ public class ProduitFinancierResource {
     }
 
     @PutMapping("/{id}")
-    public ProduitFinancierDTO update(@PathVariable Long id, @RequestBody ProduitFinancierDTO dto) {
+    public ProduitFinancierDTO update(@PathVariable Long id, @Valid @RequestBody ProduitFinancierDTO dto) {
         log.debug("REST request to update ProduitFinancier : {}", dto);
         return produitFinancierService.updateProduitFinancier(dto, id);
     }

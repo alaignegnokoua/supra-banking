@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.AmplitudeDataService;
 import com.suprabanking.services.dto.AmplitudeDataDTO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,7 +22,7 @@ public class AmplitudeDataResource {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public AmplitudeDataDTO save(@RequestBody AmplitudeDataDTO dto) {
+    public AmplitudeDataDTO save(@Valid @RequestBody AmplitudeDataDTO dto) {
         log.debug("REST request to save AmplitudeData : {}", dto);
         return amplitudeDataService.saveAmplitudeData(dto);
     }
@@ -42,7 +43,7 @@ public class AmplitudeDataResource {
     }
 
     @PutMapping("/{id}")
-    public AmplitudeDataDTO update(@PathVariable Long id, @RequestBody AmplitudeDataDTO dto) {
+    public AmplitudeDataDTO update(@PathVariable Long id, @Valid @RequestBody AmplitudeDataDTO dto) {
         log.debug("REST request to update AmplitudeData : {}", dto);
         return amplitudeDataService.updateAmplitudeData(dto, id);
     }

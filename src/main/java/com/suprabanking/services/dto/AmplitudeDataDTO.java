@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -15,7 +17,10 @@ import java.time.LocalDateTime;
 public class AmplitudeDataDTO implements Serializable {
 
     private Long id;
+    @NotBlank(message = "Le code opération est obligatoire")
     private String codeOperation;
+    @NotBlank(message = "Les données sont obligatoires")
     private String donnees;
+    @NotNull(message = "La date de synchronisation est obligatoire")
     private LocalDateTime dateSynchronisation;
 }
