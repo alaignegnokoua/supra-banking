@@ -44,6 +44,26 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public int markAllMyNotificationsAsRead() {
+        Long clientId = currentUserService.requireCurrentClientId();
+        List<Notification> unread = notificationRepository.findByClientIdAndStatutOrderByDateEnvoiDesc(clientId, STATUT_NON_LU);
+
+        if (unread.isEmpty()) {
+            return 0;
+        }
+
+        unread.forEach(n -> n.setStatut(STATUT_LU));
+        notificationRepository.saveAll(unread);
+        return unread.size();
+    }
+
+    @Override
+    public long countMyUnreadNotifications() {
+        Long clientId = currentUserService.requireCurrentClientId();
+        return notificationRepository.countByClientIdAndStatut(clientId, STATUT_NON_LU);
+    }
+
+    @Override
     public void createForClient(Long clientId, String contenu) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client introuvable pour notification"));

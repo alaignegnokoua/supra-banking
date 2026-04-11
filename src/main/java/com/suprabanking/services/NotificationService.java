@@ -7,5 +7,7 @@ import java.util.List;
 public interface NotificationService {
     List<NotificationDTO> findMyNotifications();
     NotificationDTO markAsRead(Long id);
+    int markAllMyNotificationsAsRead();
+    long countMyUnreadNotifications();
     void createForClient(Long clientId, String contenu);
 }

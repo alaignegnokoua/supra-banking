@@ -2,8 +2,10 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.dto.NotificationDTO;
+import com.suprabanking.services.dto.NotificationUnreadCountDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,5 +28,18 @@ public class NotificationResource {
     public NotificationDTO markAsRead(@PathVariable Long id) {
         log.debug("REST request to mark notification as read: {}", id);
         return notificationService.markAsRead(id);
+    }
+
+    @PatchMapping("/me/read-all")
+    public ResponseEntity<Void> markAllAsRead() {
+        log.debug("REST request to mark all notifications as read");
+        notificationService.markAllMyNotificationsAsRead();
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me/unread-count")
+    public NotificationUnreadCountDTO getUnreadCount() {
+        log.debug("REST request to get unread notifications count");
+        return new NotificationUnreadCountDTO(notificationService.countMyUnreadNotifications());
     }
 }

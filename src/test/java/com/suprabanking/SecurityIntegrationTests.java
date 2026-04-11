@@ -23,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -475,6 +476,20 @@ class SecurityIntegrationTests {
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("Virement externe effectué")));
+
+        mockMvc.perform(get("/api/notifications/me/unread-count")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(1));
+
+        mockMvc.perform(patch("/api/notifications/me/read-all")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/notifications/me/unread-count")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(0));
 
         mockMvc.perform(get("/api/audits/me")
                 .header("Authorization", "Bearer " + token))
