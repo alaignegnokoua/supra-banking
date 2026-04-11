@@ -480,35 +480,69 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant, String operationType) {
-        if (montant == null || montant <= 0) {
-            return new TransferRiskAssessmentDTO(0, "FAIBLE", false, "Risque faible");
-        }
-
         String normalizedOperationType = normalizeOperationType(operationType);
         boolean isExternal = isExternalOperation(normalizedOperationType);
+        int defaultThreshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
+        int threshold = isExternal
+            ? (transferRiskBlockThresholdExternal == null ? defaultThreshold : transferRiskBlockThresholdExternal)
+            : (transferRiskBlockThresholdInternal == null ? defaultThreshold : transferRiskBlockThresholdInternal);
+
+        if (montant == null || montant <= 0) {
+            return new TransferRiskAssessmentDTO(
+                0,
+                "FAIBLE",
+                false,
+                "Risque faible",
+                normalizedOperationType,
+                threshold,
+                0.0,
+                0.0,
+                0.0,
+                0,
+                0,
+                0
+            );
+        }
 
         double amountRatio = ratio(montant, maxSingleTransferAmount);
         double dailyAmountRatio = ratio(getTodayOutgoingTotal(clientId) + montant, maxDailyTransferTotal);
         double dailyCountRatio = ratio((double) (getTodayOutgoingCount(clientId) + 1L),
                 maxDailyTransferCount == null ? null : maxDailyTransferCount.doubleValue());
 
-        double weightedScore = isExternal
-                ? (amountRatio * 0.6 + dailyAmountRatio * 0.25 + dailyCountRatio * 0.15)
-                : (amountRatio * 0.4 + dailyAmountRatio * 0.4 + dailyCountRatio * 0.2);
+        double amountWeight = isExternal ? 0.6 : 0.4;
+        double dailyAmountWeight = isExternal ? 0.25 : 0.4;
+        double dailyCountWeight = isExternal ? 0.15 : 0.2;
 
-        int score = (int) Math.round(weightedScore * 100.0);
+        int amountScore = (int) Math.round(amountRatio * amountWeight * 100.0);
+        int dailyAmountScore = (int) Math.round(dailyAmountRatio * dailyAmountWeight * 100.0);
+        int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
+
+        int score = amountScore + dailyAmountScore + dailyCountScore;
+        if (score > 100) {
+            score = 100;
+        }
+
         String level = score >= 70 ? "ELEVE" : (score >= 40 ? "MOYEN" : "FAIBLE");
-        int defaultThreshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
-        int threshold = isExternal
-                ? (transferRiskBlockThresholdExternal == null ? defaultThreshold : transferRiskBlockThresholdExternal)
-                : (transferRiskBlockThresholdInternal == null ? defaultThreshold : transferRiskBlockThresholdInternal);
         boolean blocked = score >= threshold;
 
         String message = blocked
                 ? "Risque de fraude élevé détecté (score=" + score + ")"
                 : "Risque " + level.toLowerCase() + " (score=" + score + ")";
 
-        return new TransferRiskAssessmentDTO(score, level, blocked, message);
+        return new TransferRiskAssessmentDTO(
+            score,
+            level,
+            blocked,
+            message,
+            normalizedOperationType,
+            threshold,
+            amountRatio,
+            dailyAmountRatio,
+            dailyCountRatio,
+            amountScore,
+            dailyAmountScore,
+            dailyCountScore
+        );
     }
 
     private String normalizeOperationType(String operationType) {

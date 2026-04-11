@@ -481,7 +481,15 @@ class SecurityIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.score").isNumber())
             .andExpect(jsonPath("$.level").value("ELEVE"))
-            .andExpect(jsonPath("$.blocked").value(true));
+            .andExpect(jsonPath("$.blocked").value(true))
+            .andExpect(jsonPath("$.operationType").value("EXTERNE"))
+            .andExpect(jsonPath("$.blockThreshold").value(90))
+            .andExpect(jsonPath("$.amountScore").isNumber())
+            .andExpect(jsonPath("$.dailyAmountScore").isNumber())
+            .andExpect(jsonPath("$.dailyCountScore").isNumber())
+            .andExpect(jsonPath("$.amountRatio").isNumber())
+            .andExpect(jsonPath("$.dailyAmountRatio").isNumber())
+            .andExpect(jsonPath("$.dailyCountRatio").isNumber());
         }
 
         @Test
@@ -520,7 +528,9 @@ class SecurityIntegrationTests {
                 .queryParam("type", "INTERNE")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.blocked").value(false));
+            .andExpect(jsonPath("$.blocked").value(false))
+            .andExpect(jsonPath("$.operationType").value("INTERNE"))
+            .andExpect(jsonPath("$.blockThreshold").value(95));
         }
 
         @Test
