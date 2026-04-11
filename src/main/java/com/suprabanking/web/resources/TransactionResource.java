@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 
@@ -55,6 +56,12 @@ public class TransactionResource {
     public void effectuerVirementExterne(@Valid @RequestBody VirementExterneRequest request) {
         log.debug("REST request to process external transfer: {}", request);
         transactionService.effectuerVirementExterne(request);
+    }
+
+    @GetMapping("/me/limits")
+    public TransferLimitStatusDTO getMyTransferLimits() {
+        log.debug("REST request to get current client transfer limits");
+        return transactionService.getMyTransferLimits();
     }
 
     @GetMapping("/{id}")

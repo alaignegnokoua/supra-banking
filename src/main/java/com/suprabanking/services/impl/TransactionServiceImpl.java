@@ -24,6 +24,7 @@ import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.mapper.TransactionMapper;
@@ -273,6 +274,22 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    public TransferLimitStatusDTO getMyTransferLimits() {
+        Long clientId = currentUserService.requireCurrentClientId();
+        Double todayOutgoingTotal = getTodayOutgoingTotal(clientId);
+
+        double effectiveDailyMax = maxDailyTransferTotal == null ? 0.0 : maxDailyTransferTotal;
+        double remainingDailyAmount = Math.max(0.0, effectiveDailyMax - todayOutgoingTotal);
+
+        return new TransferLimitStatusDTO(
+                maxSingleTransferAmount,
+                maxDailyTransferTotal,
+                todayOutgoingTotal,
+                remainingDailyAmount
+        );
+    }
+
+    @Override
     public Page<TransactionDTO> findMyTransactionsByCompte(
             Long compteId,
             String type,
@@ -365,9 +382,7 @@ public class TransactionServiceImpl implements TransactionService {
             throw new IllegalArgumentException("Montant supérieur au plafond unitaire autorisé");
         }
 
-        LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
-        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
-        Double alreadyTransferred = transactionRepository.sumDailyOutgoingTransfers(clientId, startOfDay, endOfDay);
+        Double alreadyTransferred = getTodayOutgoingTotal(clientId);
         double totalAfterTransfer = (alreadyTransferred == null ? 0.0 : alreadyTransferred) + montant;
 
         if (maxDailyTransferTotal != null && totalAfterTransfer > maxDailyTransferTotal) {
@@ -375,5 +390,12 @@ public class TransactionServiceImpl implements TransactionService {
                     compteSourceId, compteDestinationId, beneficiaireId, montant);
             throw new IllegalArgumentException("Plafond journalier de virement dépassé");
         }
+    }
+
+    private Double getTodayOutgoingTotal(Long clientId) {
+        LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+        Double total = transactionRepository.sumDailyOutgoingTransfers(clientId, startOfDay, endOfDay);
+        return total == null ? 0.0 : total;
     }
 }

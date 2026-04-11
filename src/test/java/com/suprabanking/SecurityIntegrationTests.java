@@ -433,6 +433,19 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void clientShouldReadOwnTransferLimits() throws Exception {
+        String token = registerAndGetToken("clientLimitStatus", "clientLimitStatus@test.local", "Secret123!");
+
+        mockMvc.perform(get("/api/transactions/me/limits")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.maxSingleAmount").value(10000.0))
+            .andExpect(jsonPath("$.maxDailyTotal").value(15000.0))
+            .andExpect(jsonPath("$.todayOutgoingTotal").value(0.0))
+            .andExpect(jsonPath("$.remainingDailyAmount").value(15000.0));
+        }
+
+        @Test
         void clientShouldManageOwnBeneficiaires() throws Exception {
         String token = registerAndGetToken("clientBenA", "clientBenA@test.local", "Secret123!");
 

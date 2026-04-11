@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 
@@ -21,6 +22,8 @@ public interface TransactionService {
     void effectuerVirementInterne(VirementInterneRequest request);
 
     void effectuerVirementExterne(VirementExterneRequest request);
+
+    TransferLimitStatusDTO getMyTransferLimits();
 
     Page<TransactionDTO> findAllTransactions(Pageable pageable);
 
