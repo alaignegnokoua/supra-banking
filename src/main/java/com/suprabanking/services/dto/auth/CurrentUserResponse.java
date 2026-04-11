@@ -28,4 +28,5 @@ public class CurrentUserResponse {
     private String clientTelephone;
     private boolean notificationsInAppEnabled;
     private boolean notificationsEmailEnabled;
+    private String riskProfile;
 }

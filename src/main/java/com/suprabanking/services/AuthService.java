@@ -59,6 +59,7 @@ public class AuthService {
         client.setMotDePasse(passwordEncoder.encode(request.getPassword()));
         client.setNotificationsInAppEnabled(true);
         client.setNotificationsEmailEnabled(false);
+        client.setRiskProfile("STANDARD");
         client = clientRepository.save(client);
 
         User user = new User();
@@ -107,6 +108,7 @@ public class AuthService {
             .clientTelephone(client != null ? client.getTelephone() : null)
             .notificationsInAppEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsInAppEnabled()))
             .notificationsEmailEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsEmailEnabled()))
+            .riskProfile(client != null && client.getRiskProfile() != null ? client.getRiskProfile() : "STANDARD")
                 .build();
     }
 

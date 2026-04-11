@@ -47,6 +47,9 @@ public class Client implements Serializable {
     @Column(name = "notifications_email_enabled")
     private Boolean notificationsEmailEnabled;
 
+    @Column(name = "risk_profile")
+    private String riskProfile;
+
     @OneToMany(mappedBy = "client")
     private List<Compte> comptes;
 

@@ -71,6 +71,24 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.risk-block-threshold-external:90}")
     private Integer transferRiskBlockThresholdExternal;
 
+    @Value("${app.transfers.risk-block-threshold-internal-sensitive:90}")
+    private Integer transferRiskBlockThresholdInternalSensitive;
+
+    @Value("${app.transfers.risk-block-threshold-internal-standard:95}")
+    private Integer transferRiskBlockThresholdInternalStandard;
+
+    @Value("${app.transfers.risk-block-threshold-internal-vip:98}")
+    private Integer transferRiskBlockThresholdInternalVip;
+
+    @Value("${app.transfers.risk-block-threshold-external-sensitive:85}")
+    private Integer transferRiskBlockThresholdExternalSensitive;
+
+    @Value("${app.transfers.risk-block-threshold-external-standard:90}")
+    private Integer transferRiskBlockThresholdExternalStandard;
+
+    @Value("${app.transfers.risk-block-threshold-external-vip:95}")
+    private Integer transferRiskBlockThresholdExternalVip;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -419,6 +437,7 @@ public class TransactionServiceImpl implements TransactionService {
             // Store risk details as a map
             java.util.Map<String, Object> riskDetails = new java.util.HashMap<>();
             riskDetails.put("operationType", risk.getOperationType());
+            riskDetails.put("riskProfile", risk.getRiskProfile());
             riskDetails.put("blockThreshold", risk.getBlockThreshold());
             riskDetails.put("amountRatio", risk.getAmountRatio());
             riskDetails.put("dailyAmountRatio", risk.getDailyAmountRatio());
@@ -521,10 +540,12 @@ public class TransactionServiceImpl implements TransactionService {
     private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant, String operationType) {
         String normalizedOperationType = normalizeOperationType(operationType);
         boolean isExternal = isExternalOperation(normalizedOperationType);
-        int defaultThreshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
-        int threshold = isExternal
-            ? (transferRiskBlockThresholdExternal == null ? defaultThreshold : transferRiskBlockThresholdExternal)
-            : (transferRiskBlockThresholdInternal == null ? defaultThreshold : transferRiskBlockThresholdInternal);
+        String riskProfile = clientRepository.findById(clientId)
+                .map(Client::getRiskProfile)
+                .map(this::normalizeRiskProfile)
+                .orElse("STANDARD");
+
+        int threshold = resolveDynamicBlockThreshold(isExternal, riskProfile);
 
         if (montant == null || montant <= 0) {
             return new TransferRiskAssessmentDTO(
@@ -533,6 +554,7 @@ public class TransactionServiceImpl implements TransactionService {
                 false,
                 "Risque faible",
                 normalizedOperationType,
+                riskProfile,
                 threshold,
                 0.0,
                 0.0,
@@ -574,6 +596,7 @@ public class TransactionServiceImpl implements TransactionService {
             blocked,
             message,
             normalizedOperationType,
+            riskProfile,
             threshold,
             amountRatio,
             dailyAmountRatio,
@@ -599,6 +622,51 @@ public class TransactionServiceImpl implements TransactionService {
 
     private boolean isExternalOperation(String normalizedOperationType) {
         return "EXTERNE".equals(normalizedOperationType) || "VIREMENT_EXTERNE".equals(normalizedOperationType);
+    }
+
+    private String normalizeRiskProfile(String riskProfile) {
+        if (riskProfile == null || riskProfile.isBlank()) {
+            return "STANDARD";
+        }
+
+        String normalized = riskProfile.trim().toUpperCase();
+        if ("SENSIBLE".equals(normalized) || "VIP".equals(normalized)) {
+            return normalized;
+        }
+
+        return "STANDARD";
+    }
+
+    private int resolveDynamicBlockThreshold(boolean isExternal, String riskProfile) {
+        int defaultThreshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
+        int defaultExternal = transferRiskBlockThresholdExternal == null ? defaultThreshold : transferRiskBlockThresholdExternal;
+        int defaultInternal = transferRiskBlockThresholdInternal == null ? defaultThreshold : transferRiskBlockThresholdInternal;
+
+        if (isExternal) {
+            return switch (riskProfile) {
+                case "SENSIBLE" -> transferRiskBlockThresholdExternalSensitive == null
+                        ? defaultExternal
+                        : transferRiskBlockThresholdExternalSensitive;
+                case "VIP" -> transferRiskBlockThresholdExternalVip == null
+                        ? defaultExternal
+                        : transferRiskBlockThresholdExternalVip;
+                default -> transferRiskBlockThresholdExternalStandard == null
+                        ? defaultExternal
+                        : transferRiskBlockThresholdExternalStandard;
+            };
+        }
+
+        return switch (riskProfile) {
+            case "SENSIBLE" -> transferRiskBlockThresholdInternalSensitive == null
+                    ? defaultInternal
+                    : transferRiskBlockThresholdInternalSensitive;
+            case "VIP" -> transferRiskBlockThresholdInternalVip == null
+                    ? defaultInternal
+                    : transferRiskBlockThresholdInternalVip;
+            default -> transferRiskBlockThresholdInternalStandard == null
+                    ? defaultInternal
+                    : transferRiskBlockThresholdInternalStandard;
+        };
     }
 
     private double ratio(Double value, Double max) {

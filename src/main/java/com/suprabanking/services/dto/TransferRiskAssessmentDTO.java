@@ -18,6 +18,7 @@ public class TransferRiskAssessmentDTO implements Serializable {
     private Boolean blocked;
     private String message;
     private String operationType;
+    private String riskProfile;
     private Integer blockThreshold;
     private Double amountRatio;
     private Double dailyAmountRatio;

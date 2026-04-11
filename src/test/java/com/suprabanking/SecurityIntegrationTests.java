@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suprabanking.models.Compte;
 import com.suprabanking.models.Transaction;
 import com.suprabanking.models.User;
+import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.CompteRepository;
 import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.repositories.UserRepository;
@@ -44,6 +45,9 @@ class SecurityIntegrationTests {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ClientRepository clientRepository;
 
     @Autowired
     private CompteRepository compteRepository;
@@ -532,6 +536,64 @@ class SecurityIntegrationTests {
             .andExpect(jsonPath("$.blocked").value(false))
             .andExpect(jsonPath("$.operationType").value("INTERNE"))
             .andExpect(jsonPath("$.blockThreshold").value(95));
+        }
+
+        @Test
+        void riskPreviewShouldAdaptThresholdToClientRiskProfile() throws Exception {
+        String token = registerAndGetToken("clientRiskProfileA", "clientRiskProfileA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskProfileA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-PROFILE-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        for (int i = 0; i < 7; i++) {
+            Transaction existingOutgoing = new Transaction();
+            existingOutgoing.setType("virement_externe");
+            existingOutgoing.setMontant(285.0);
+            existingOutgoing.setDateTransaction(LocalDateTime.now().minusMinutes(25 + i));
+            existingOutgoing.setDescription("Virement profil dynamique " + i);
+            existingOutgoing.setClient(user.getClient());
+            existingOutgoing.setCompte(source);
+            transactionRepository.save(existingOutgoing);
+        }
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "10000")
+                .queryParam("type", "EXTERNE")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blocked").value(true))
+            .andExpect(jsonPath("$.riskProfile").value("STANDARD"))
+            .andExpect(jsonPath("$.blockThreshold").value(90));
+
+        user.getClient().setRiskProfile("VIP");
+        clientRepository.save(user.getClient());
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "10000")
+                .queryParam("type", "EXTERNE")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blocked").value(false))
+            .andExpect(jsonPath("$.riskProfile").value("VIP"))
+            .andExpect(jsonPath("$.blockThreshold").value(95));
+
+        user.getClient().setRiskProfile("SENSIBLE");
+        clientRepository.save(user.getClient());
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "10000")
+                .queryParam("type", "EXTERNE")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blocked").value(true))
+            .andExpect(jsonPath("$.riskProfile").value("SENSIBLE"))
+            .andExpect(jsonPath("$.blockThreshold").value(85));
         }
 
         @Test
