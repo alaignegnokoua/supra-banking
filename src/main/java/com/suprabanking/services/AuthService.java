@@ -11,6 +11,7 @@ import com.suprabanking.services.dto.auth.AuthResponse;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
+import com.suprabanking.services.dto.auth.UpdateProfileRequest;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -101,6 +102,36 @@ public class AuthService {
             .clientEmail(client != null ? client.getEmail() : null)
             .clientTelephone(client != null ? client.getTelephone() : null)
                 .build();
+    }
+
+    public CurrentUserResponse updateCurrentUserProfile(String username, UpdateProfileRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        Client client = user.getClient();
+        if (client == null) {
+            throw new ResourceNotFoundException("Profil client introuvable");
+        }
+
+        String newEmail = request.getEmail().trim();
+        String currentEmail = user.getEmail();
+
+        if (currentEmail == null || !currentEmail.equalsIgnoreCase(newEmail)) {
+            if (userRepository.existsByEmail(newEmail)) {
+                throw new IllegalArgumentException("Cet email est déjà utilisé");
+            }
+        }
+
+        user.setEmail(newEmail);
+        client.setEmail(newEmail);
+        client.setNom(request.getNom().trim());
+        client.setPrenom(request.getPrenom().trim());
+        client.setTelephone(request.getTelephone() != null ? request.getTelephone().trim() : null);
+
+        clientRepository.save(client);
+        userRepository.save(user);
+
+        return getCurrentUser(username);
     }
 
     private AuthResponse buildAuthResponse(User user) {

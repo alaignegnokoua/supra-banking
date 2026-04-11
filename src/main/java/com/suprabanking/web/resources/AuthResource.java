@@ -5,6 +5,7 @@ import com.suprabanking.services.dto.auth.AuthResponse;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
+import com.suprabanking.services.dto.auth.UpdateProfileRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 
 import java.security.Principal;
 
@@ -41,5 +43,11 @@ public class AuthResource {
     @GetMapping("/me")
     public ResponseEntity<CurrentUserResponse> me(Principal principal) {
         return ResponseEntity.ok(authService.getCurrentUser(principal.getName()));
+    }
+
+    @PutMapping("/me/profile")
+    public ResponseEntity<CurrentUserResponse> updateProfile(Principal principal,
+                                                             @Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(authService.updateCurrentUserProfile(principal.getName(), request));
     }
 }

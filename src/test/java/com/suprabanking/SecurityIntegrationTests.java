@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -98,6 +99,31 @@ class SecurityIntegrationTests {
             .andExpect(jsonPath("$.username").value("clientProfile"))
             .andExpect(jsonPath("$.clientId").isNumber())
             .andExpect(jsonPath("$.clientEmail").value("clientProfile@test.local"));
+        }
+
+        @Test
+        void currentUserShouldUpdateOwnProfile() throws Exception {
+        String token = registerAndGetToken("clientEdit", "clientEdit@test.local", "Secret123!");
+
+        String payload = """
+            {
+              "nom": "Diallo",
+              "prenom": "Aminata",
+              "email": "clientEdit.updated@test.local",
+              "telephone": "+2250102030405"
+            }
+            """;
+
+        mockMvc.perform(put("/api/auth/me/profile")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.username").value("clientEdit"))
+            .andExpect(jsonPath("$.email").value("clientEdit.updated@test.local"))
+            .andExpect(jsonPath("$.clientNom").value("Diallo"))
+            .andExpect(jsonPath("$.clientPrenom").value("Aminata"))
+            .andExpect(jsonPath("$.clientTelephone").value("+2250102030405"));
         }
 
         @Test

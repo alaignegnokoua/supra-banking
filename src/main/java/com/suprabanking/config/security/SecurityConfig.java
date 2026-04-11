@@ -43,6 +43,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/auth/me/profile").authenticated()
 
                 .requestMatchers(HttpMethod.GET, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.POST, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
