@@ -8,6 +8,7 @@ import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.RoleRepository;
 import com.suprabanking.repositories.UserRepository;
 import com.suprabanking.services.dto.auth.AuthResponse;
+import com.suprabanking.services.dto.auth.ChangePasswordRequest;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
@@ -132,6 +133,29 @@ public class AuthService {
         userRepository.save(user);
 
         return getCurrentUser(username);
+    }
+
+    public void changeCurrentUserPassword(String username, ChangePasswordRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getMotDePasse())) {
+            throw new IllegalArgumentException("Mot de passe actuel invalide");
+        }
+
+        if (request.getCurrentPassword().equals(request.getNewPassword())) {
+            throw new IllegalArgumentException("Le nouveau mot de passe doit être différent de l'ancien");
+        }
+
+        String encoded = passwordEncoder.encode(request.getNewPassword());
+        user.setMotDePasse(encoded);
+        userRepository.save(user);
+
+        Client client = user.getClient();
+        if (client != null) {
+            client.setMotDePasse(encoded);
+            clientRepository.save(client);
+        }
     }
 
     private AuthResponse buildAuthResponse(User user) {

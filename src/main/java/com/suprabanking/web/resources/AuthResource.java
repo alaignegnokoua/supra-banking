@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.AuthService;
 import com.suprabanking.services.dto.auth.AuthResponse;
+import com.suprabanking.services.dto.auth.ChangePasswordRequest;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
@@ -49,5 +50,12 @@ public class AuthResource {
     public ResponseEntity<CurrentUserResponse> updateProfile(Principal principal,
                                                              @Valid @RequestBody UpdateProfileRequest request) {
         return ResponseEntity.ok(authService.updateCurrentUserProfile(principal.getName(), request));
+    }
+
+    @PutMapping("/me/password")
+    public ResponseEntity<Void> changePassword(Principal principal,
+                                               @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changeCurrentUserPassword(principal.getName(), request);
+        return ResponseEntity.noContent().build();
     }
 }

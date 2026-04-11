@@ -127,6 +127,49 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void currentUserShouldChangeOwnPassword() throws Exception {
+        String token = registerAndGetToken("clientPwdA", "clientPwdA@test.local", "Secret123!");
+
+        String payload = """
+            {
+              "currentPassword": "Secret123!",
+              "newPassword": "Secret456!"
+            }
+            """;
+
+        mockMvc.perform(put("/api/auth/me/password")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isNoContent());
+
+        String oldLoginPayload = """
+            {
+              "username": "clientPwdA",
+              "password": "Secret123!"
+            }
+            """;
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(oldLoginPayload))
+            .andExpect(status().isUnauthorized());
+
+        String newLoginPayload = """
+            {
+              "username": "clientPwdA",
+              "password": "Secret456!"
+            }
+            """;
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(newLoginPayload))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.token").isString());
+        }
+
+        @Test
         void clientShouldBeForbiddenWhenReadingAnotherClientCompteById() throws Exception {
         String tokenUser1 = registerAndGetToken("clientOwn1", "clientOwn1@test.local", "Secret123!");
         registerAndGetToken("clientOwn2", "clientOwn2@test.local", "Secret123!");
