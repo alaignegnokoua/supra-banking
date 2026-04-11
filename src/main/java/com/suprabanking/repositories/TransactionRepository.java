@@ -40,4 +40,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("montantMax") Double montantMax,
             Pageable pageable
         );
+
+        @Query("""
+            select coalesce(sum(t.montant), 0)
+            from Transaction t
+            where t.client.id = :clientId
+              and t.dateTransaction >= :start
+              and t.dateTransaction <= :end
+              and (
+                    lower(t.type) = 'virement_externe'
+                    or (lower(t.type) = 'virement' and lower(t.description) like '%débit vers%')
+                  )
+            """)
+        Double sumDailyOutgoingTransfers(
+            @Param("clientId") Long clientId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+        );
 }

@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.suprabanking.config.security.CurrentUserService;
 import com.suprabanking.models.Beneficiaire;
@@ -44,6 +45,12 @@ public class TransactionServiceImpl implements TransactionService {
     private final NotificationService notificationService;
     private final TransactionMapper transactionMapper;
     private final CurrentUserService currentUserService;
+
+    @Value("${app.transfers.max-single-amount:10000}")
+    private Double maxSingleTransferAmount;
+
+    @Value("${app.transfers.max-daily-total:15000}")
+    private Double maxDailyTransferTotal;
 
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
@@ -155,6 +162,9 @@ public class TransactionServiceImpl implements TransactionService {
             throw new IllegalArgumentException("Solde insuffisant pour effectuer ce virement");
         }
 
+        validateTransferLimits(clientId, request.getMontant(), "VIREMENT_INTERNE",
+            request.getCompteSourceId(), request.getCompteDestinationId(), null);
+
         compteSource.setSolde(compteSource.getSolde() - request.getMontant());
         compteDestination.setSolde(compteDestination.getSolde() + request.getMontant());
 
@@ -218,6 +228,9 @@ public class TransactionServiceImpl implements TransactionService {
                     request.getCompteSourceId(), null, request.getBeneficiaireId(), request.getMontant());
             throw new IllegalArgumentException("Solde insuffisant pour effectuer ce virement externe");
         }
+
+        validateTransferLimits(clientId, request.getMontant(), "VIREMENT_EXTERNE",
+            request.getCompteSourceId(), null, request.getBeneficiaireId());
 
         compteSource.setSolde(compteSource.getSolde() - request.getMontant());
         compteRepository.save(compteSource);
@@ -332,5 +345,35 @@ public class TransactionServiceImpl implements TransactionService {
         audit.setBeneficiaireId(beneficiaireId);
         audit.setMontant(montant);
         operationAuditRepository.save(audit);
+    }
+
+    private void validateTransferLimits(
+            Long clientId,
+            Double montant,
+            String operationType,
+            Long compteSourceId,
+            Long compteDestinationId,
+            Long beneficiaireId
+    ) {
+        if (montant == null || montant <= 0) {
+            return;
+        }
+
+        if (maxSingleTransferAmount != null && montant > maxSingleTransferAmount) {
+            saveAudit(operationType, "ECHEC", "Plafond unitaire dépassé", clientId,
+                    compteSourceId, compteDestinationId, beneficiaireId, montant);
+            throw new IllegalArgumentException("Montant supérieur au plafond unitaire autorisé");
+        }
+
+        LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+        Double alreadyTransferred = transactionRepository.sumDailyOutgoingTransfers(clientId, startOfDay, endOfDay);
+        double totalAfterTransfer = (alreadyTransferred == null ? 0.0 : alreadyTransferred) + montant;
+
+        if (maxDailyTransferTotal != null && totalAfterTransfer > maxDailyTransferTotal) {
+            saveAudit(operationType, "ECHEC", "Plafond journalier dépassé", clientId,
+                    compteSourceId, compteDestinationId, beneficiaireId, montant);
+            throw new IllegalArgumentException("Plafond journalier de virement dépassé");
+        }
     }
 }

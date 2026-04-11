@@ -385,6 +385,54 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void clientShouldNotProcessExternalTransferWhenSingleLimitIsExceeded() throws Exception {
+        String token = registerAndGetToken("clientLimitA", "clientLimitA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientLimitA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("LIM-SRC-1");
+        source.setType("courant");
+        source.setSolde(50000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        String payloadBeneficiaire = """
+            {
+              "nom": "Prestataire Limit",
+              "iban": "FR7630001007941234567890187",
+              "banque": "Banque Externe",
+              "email": "limit@test.local"
+            }
+            """;
+
+        MvcResult benResult = mockMvc.perform(post("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadBeneficiaire))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        Long beneficiaireId = objectMapper.readTree(benResult.getResponse().getContentAsString()).get("id").asLong();
+
+        String payloadTransfer = """
+            {
+              "compteSourceId": %d,
+              "beneficiaireId": %d,
+              "montant": 20000,
+              "description": "Test plafond unitaire"
+            }
+            """.formatted(source.getId(), beneficiaireId);
+
+        mockMvc.perform(post("/api/transactions/me/virement-externe")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadTransfer))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(containsString("plafond unitaire")));
+        }
+
+        @Test
         void clientShouldManageOwnBeneficiaires() throws Exception {
         String token = registerAndGetToken("clientBenA", "clientBenA@test.local", "Secret123!");
 
