@@ -651,6 +651,76 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void blockedRiskTransferShouldCreateFraudAlertNotification() throws Exception {
+        String token = registerAndGetToken("clientFraudAlert", "clientFraudAlert@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientFraudAlert").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("FRAUD-ALERT-SRC");
+        source.setType("courant");
+        source.setSolde(120000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        for (int i = 0; i < 9; i++) {
+            Transaction existingOutgoing = new Transaction();
+            existingOutgoing.setType("virement_externe");
+            existingOutgoing.setMontant(1000.0);
+            existingOutgoing.setDateTransaction(LocalDateTime.now().minusMinutes(180 + i));
+            existingOutgoing.setDescription("Historique risque fraude " + i);
+            existingOutgoing.setClient(user.getClient());
+            existingOutgoing.setCompte(source);
+            transactionRepository.save(existingOutgoing);
+        }
+
+        String payloadBeneficiaire = """
+            {
+              "nom": "Fournisseur Risque",
+              "iban": "FR7630001007941234567890177",
+              "banque": "Banque Externe",
+              "email": "fournisseur.risque@test.local"
+            }
+            """;
+
+        MvcResult benResult = mockMvc.perform(post("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadBeneficiaire))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        Long beneficiaireId = objectMapper.readTree(benResult.getResponse().getContentAsString()).get("id").asLong();
+
+        String payloadTransfer = """
+            {
+              "compteSourceId": %d,
+              "beneficiaireId": %d,
+              "montant": 10000,
+              "description": "Tentative risque élevé"
+            }
+            """.formatted(source.getId(), beneficiaireId);
+
+        mockMvc.perform(post("/api/transactions/me/virement-externe")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadTransfer))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(containsString("Risque de fraude élevé")));
+
+        mockMvc.perform(get("/api/notifications/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("ALERTE FRAUDE")))
+            .andExpect(content().string(containsString("bloqué")));
+
+        mockMvc.perform(get("/api/notifications/me/unread-count")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(1));
+        }
+
+        @Test
         void clientShouldManageOwnBeneficiaires() throws Exception {
         String token = registerAndGetToken("clientBenA", "clientBenA@test.local", "Secret123!");
 

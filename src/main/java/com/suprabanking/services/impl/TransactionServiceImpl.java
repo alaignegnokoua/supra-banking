@@ -30,7 +30,6 @@ import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.dto.OperationAuditDTO;
-import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.mapper.TransactionMapper;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 
@@ -455,6 +454,11 @@ public class TransactionServiceImpl implements TransactionService {
         if (Boolean.TRUE.equals(risk.getBlocked())) {
             saveAudit(operationType, "ECHEC", "Risque élevé détecté: score=" + risk.getScore(), clientId,
                 compteSourceId, compteDestinationId, beneficiaireId, montant, risk);
+            notificationService.createForClient(
+                    clientId,
+                    "ALERTE FRAUDE - Virement " + normalizeOperationType(operationType)
+                            + " bloqué (score=" + risk.getScore() + ", montant=" + montant + ")"
+            );
             throw new IllegalArgumentException(risk.getMessage());
         }
 
