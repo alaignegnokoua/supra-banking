@@ -520,6 +520,13 @@ class SecurityIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("VIREMENT_EXTERNE")))
             .andExpect(content().string(containsString("SUCCES")));
+
+        mockMvc.perform(get("/api/audits/me/page")
+                .queryParam("page", "0")
+                .queryParam("size", "1")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content").isArray());
         }
 
         @Test

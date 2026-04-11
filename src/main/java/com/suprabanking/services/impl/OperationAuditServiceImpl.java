@@ -7,6 +7,8 @@ import com.suprabanking.services.OperationAuditService;
 import com.suprabanking.services.dto.OperationAuditDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,6 +28,13 @@ public class OperationAuditServiceImpl implements OperationAuditService {
                 .stream()
                 .map(this::toDto)
                 .toList();
+    }
+
+    @Override
+    public Page<OperationAuditDTO> findMyAudits(Pageable pageable) {
+        Long clientId = currentUserService.requireCurrentClientId();
+        return operationAuditRepository.findByClientIdOrderByCreatedAtDesc(clientId, pageable)
+                .map(this::toDto);
     }
 
     private OperationAuditDTO toDto(OperationAudit audit) {
