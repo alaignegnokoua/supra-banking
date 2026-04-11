@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -291,6 +292,95 @@ class SecurityIntegrationTests {
                 .content(payload))
             .andExpect(status().isBadRequest())
             .andExpect(content().string(containsString("Solde insuffisant")));
+        }
+
+        @Test
+        void clientShouldManageOwnBeneficiaires() throws Exception {
+        String token = registerAndGetToken("clientBenA", "clientBenA@test.local", "Secret123!");
+
+        String payload = """
+            {
+              "nom": "Alice Martin",
+              "iban": "FR7612345678901234567890123",
+              "banque": "Banque Test",
+              "email": "alice.martin@test.local"
+            }
+            """;
+
+        MvcResult created = mockMvc.perform(post("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isCreated())
+            .andExpect(content().string(containsString("Alice Martin")))
+            .andReturn();
+
+        Long beneficiaireId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(get("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("Alice Martin")));
+
+        mockMvc.perform(delete("/api/beneficiaires/me/" + beneficiaireId)
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNoContent());
+        }
+
+        @Test
+        void clientShouldProcessExternalTransferWithOwnBeneficiaire() throws Exception {
+        String token = registerAndGetToken("clientExtA", "clientExtA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientExtA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("EXT-SRC-1");
+        source.setType("courant");
+        source.setSolde(2000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        String payloadBeneficiaire = """
+            {
+              "nom": "Fournisseur X",
+              "iban": "FR7630001007941234567890185",
+              "banque": "Banque Externe",
+              "email": "fournisseur@test.local"
+            }
+            """;
+
+        MvcResult benResult = mockMvc.perform(post("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadBeneficiaire))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        Long beneficiaireId = objectMapper.readTree(benResult.getResponse().getContentAsString()).get("id").asLong();
+
+        String payloadTransfer = """
+            {
+              "compteSourceId": %d,
+              "beneficiaireId": %d,
+              "montant": 500,
+              "description": "Paiement fournisseur"
+            }
+            """.formatted(source.getId(), beneficiaireId);
+
+        mockMvc.perform(post("/api/transactions/me/virement-externe")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadTransfer))
+            .andExpect(status().isNoContent());
+
+        Compte sourceUpdated = compteRepository.findById(source.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(1500.0, sourceUpdated.getSolde());
+
+        mockMvc.perform(get("/api/transactions/me/compte/" + source.getId())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("virement_externe")))
+            .andExpect(content().string(containsString("Fournisseur X")));
         }
 
     private String registerAndGetToken(String username, String email, String password) throws Exception {

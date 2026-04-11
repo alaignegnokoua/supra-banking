@@ -1,14 +1,17 @@
 package com.suprabanking.services.impl;
 
 import com.suprabanking.config.security.CurrentUserService;
+import com.suprabanking.models.Beneficiaire;
 import com.suprabanking.models.Client;
 import com.suprabanking.models.Compte;
 import com.suprabanking.models.Transaction;
+import com.suprabanking.repositories.BeneficiaireRepository;
 import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.CompteRepository;
 import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.mapper.TransactionMapper;
 import com.suprabanking.web.errors.ResourceNotFoundException;
@@ -29,6 +32,7 @@ import java.util.Optional;
 public class TransactionServiceImpl implements TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final BeneficiaireRepository beneficiaireRepository;
     private final CompteRepository compteRepository;
     private final ClientRepository clientRepository;
     private final TransactionMapper transactionMapper;
@@ -170,6 +174,49 @@ public class TransactionServiceImpl implements TransactionService {
 
         transactionRepository.save(debit);
         transactionRepository.save(credit);
+    }
+
+    @Override
+    @Transactional
+    public void effectuerVirementExterne(VirementExterneRequest request) {
+        log.debug("Request to process external transfer: {}", request);
+
+        Long clientId = currentUserService.requireCurrentClientId();
+
+        Compte compteSource = compteRepository.findById(request.getCompteSourceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Compte source introuvable"));
+
+        if (compteSource.getClient() == null || !clientId.equals(compteSource.getClient().getId())) {
+            throw new AccessDeniedException("Accès refusé au compte source");
+        }
+
+        Beneficiaire beneficiaire = beneficiaireRepository.findByIdAndClient_Id(request.getBeneficiaireId(), clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bénéficiaire introuvable"));
+
+        if (compteSource.getSolde() == null || compteSource.getSolde() < request.getMontant()) {
+            throw new IllegalArgumentException("Solde insuffisant pour effectuer ce virement externe");
+        }
+
+        compteSource.setSolde(compteSource.getSolde() - request.getMontant());
+        compteRepository.save(compteSource);
+
+        String descriptionBase = (request.getDescription() == null || request.getDescription().isBlank())
+                ? "Virement externe"
+                : request.getDescription().trim();
+
+        String destination = beneficiaire.getIban() != null && !beneficiaire.getIban().isBlank()
+                ? beneficiaire.getIban()
+                : beneficiaire.getRib();
+
+        Transaction debit = new Transaction();
+        debit.setType("virement_externe");
+        debit.setMontant(request.getMontant());
+        debit.setDateTransaction(LocalDateTime.now());
+        debit.setDescription(descriptionBase + " - bénéficiaire " + beneficiaire.getNom() + " (" + destination + ")");
+        debit.setClient(compteSource.getClient());
+        debit.setCompte(compteSource);
+
+        transactionRepository.save(debit);
     }
 
     @Override

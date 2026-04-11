@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 
 public interface TransactionService {
@@ -18,6 +19,8 @@ public interface TransactionService {
     TransactionDTO partialUpdateTransaction(TransactionDTO transactionDTO, Long id);
 
     void effectuerVirementInterne(VirementInterneRequest request);
+
+    void effectuerVirementExterne(VirementExterneRequest request);
 
     Page<TransactionDTO> findAllTransactions(Pageable pageable);
 

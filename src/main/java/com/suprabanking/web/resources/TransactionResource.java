@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,13 @@ public class TransactionResource {
     public void effectuerVirementInterne(@Valid @RequestBody VirementInterneRequest request) {
         log.debug("REST request to process internal transfer: {}", request);
         transactionService.effectuerVirementInterne(request);
+    }
+
+    @PostMapping("/me/virement-externe")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void effectuerVirementExterne(@Valid @RequestBody VirementExterneRequest request) {
+        log.debug("REST request to process external transfer: {}", request);
+        transactionService.effectuerVirementExterne(request);
     }
 
     @GetMapping("/{id}")
