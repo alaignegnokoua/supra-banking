@@ -89,6 +89,12 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.risk-block-threshold-external-vip:95}")
     private Integer transferRiskBlockThresholdExternalVip;
 
+    @Value("${app.transfers.risk-new-beneficiary-window-hours:24}")
+    private Integer newBeneficiaryWindowHours;
+
+    @Value("${app.transfers.risk-new-beneficiary-score-external:15}")
+    private Integer newBeneficiaryScoreExternal;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -336,10 +342,10 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant, String operationType) {
+    public TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant, String operationType, Long beneficiaireId) {
         Long clientId = currentUserService.requireCurrentClientId();
         String normalizedOperationType = normalizeOperationType(operationType);
-        return assessTransferRisk(clientId, montant, normalizedOperationType);
+        return assessTransferRisk(clientId, montant, normalizedOperationType, beneficiaireId);
     }
 
     @Override
@@ -445,6 +451,8 @@ public class TransactionServiceImpl implements TransactionService {
             riskDetails.put("amountScore", risk.getAmountScore());
             riskDetails.put("dailyAmountScore", risk.getDailyAmountScore());
             riskDetails.put("dailyCountScore", risk.getDailyCountScore());
+            riskDetails.put("newBeneficiary", risk.getNewBeneficiary());
+            riskDetails.put("newBeneficiaryScore", risk.getNewBeneficiaryScore());
             audit.setRiskDetails(riskDetails);
         }
         
@@ -469,7 +477,7 @@ public class TransactionServiceImpl implements TransactionService {
             throw new IllegalArgumentException("Montant supérieur au plafond unitaire autorisé");
         }
 
-        TransferRiskAssessmentDTO risk = assessTransferRisk(clientId, montant, operationType);
+        TransferRiskAssessmentDTO risk = assessTransferRisk(clientId, montant, operationType, beneficiaireId);
         if (Boolean.TRUE.equals(risk.getBlocked())) {
             saveAudit(operationType, "ECHEC", "Risque élevé détecté: score=" + risk.getScore(), clientId,
                 compteSourceId, compteDestinationId, beneficiaireId, montant, risk);
@@ -537,7 +545,7 @@ public class TransactionServiceImpl implements TransactionService {
         return (int) Math.max(0L, remainingSeconds);
     }
 
-    private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant, String operationType) {
+    private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant, String operationType, Long beneficiaireId) {
         String normalizedOperationType = normalizeOperationType(operationType);
         boolean isExternal = isExternalOperation(normalizedOperationType);
         String riskProfile = clientRepository.findById(clientId)
@@ -546,6 +554,10 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElse("STANDARD");
 
         int threshold = resolveDynamicBlockThreshold(isExternal, riskProfile);
+        boolean newBeneficiary = isExternal && isNewBeneficiary(clientId, beneficiaireId);
+        int beneficiaryScore = newBeneficiary
+                ? (newBeneficiaryScoreExternal == null ? 15 : newBeneficiaryScoreExternal)
+                : 0;
 
         if (montant == null || montant <= 0) {
             return new TransferRiskAssessmentDTO(
@@ -561,7 +573,9 @@ public class TransactionServiceImpl implements TransactionService {
                 0.0,
                 0,
                 0,
-                0
+                0,
+                newBeneficiary,
+                beneficiaryScore
             );
         }
 
@@ -578,7 +592,7 @@ public class TransactionServiceImpl implements TransactionService {
         int dailyAmountScore = (int) Math.round(dailyAmountRatio * dailyAmountWeight * 100.0);
         int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
 
-        int score = amountScore + dailyAmountScore + dailyCountScore;
+        int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore;
         if (score > 100) {
             score = 100;
         }
@@ -603,8 +617,29 @@ public class TransactionServiceImpl implements TransactionService {
             dailyCountRatio,
             amountScore,
             dailyAmountScore,
-            dailyCountScore
+            dailyCountScore,
+            newBeneficiary,
+            beneficiaryScore
         );
+    }
+
+    private boolean isNewBeneficiary(Long clientId, Long beneficiaireId) {
+        if (beneficiaireId == null) {
+            return false;
+        }
+
+        return beneficiaireRepository.findByIdAndClient_Id(beneficiaireId, clientId)
+                .map(Beneficiaire::getCreatedAt)
+                .map(createdAt -> {
+                    if (createdAt == null) {
+                        return false;
+                    }
+                    int windowHours = newBeneficiaryWindowHours == null || newBeneficiaryWindowHours <= 0
+                            ? 24
+                            : newBeneficiaryWindowHours;
+                    return createdAt.isAfter(LocalDateTime.now().minusHours(windowHours));
+                })
+                .orElse(false);
     }
 
     private String normalizeOperationType(String operationType) {

@@ -26,7 +26,6 @@ import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.dto.OperationAuditDTO;
-import com.suprabanking.services.dto.OperationAuditDTO;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,10 +69,11 @@ public class TransactionResource {
     @GetMapping("/me/risk-preview")
     public TransferRiskAssessmentDTO getMyTransferRiskPreview(
             @RequestParam Double montant,
-            @RequestParam(required = false, defaultValue = "EXTERNE") String type
+            @RequestParam(required = false, defaultValue = "EXTERNE") String type,
+            @RequestParam(required = false) Long beneficiaireId
     ) {
-        log.debug("REST request to get transfer risk preview for montant={}, type={}", montant, type);
-        return transactionService.getMyTransferRiskPreview(montant, type);
+        log.debug("REST request to get transfer risk preview for montant={}, type={}, beneficiaireId={}", montant, type, beneficiaireId);
+        return transactionService.getMyTransferRiskPreview(montant, type, beneficiaireId);
     }
 
     @GetMapping("/me/audit")

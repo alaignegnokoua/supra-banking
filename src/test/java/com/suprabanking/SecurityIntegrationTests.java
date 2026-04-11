@@ -2,9 +2,11 @@ package com.suprabanking;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.suprabanking.models.Beneficiaire;
 import com.suprabanking.models.Compte;
 import com.suprabanking.models.Transaction;
 import com.suprabanking.models.User;
+import com.suprabanking.repositories.BeneficiaireRepository;
 import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.CompteRepository;
 import com.suprabanking.repositories.TransactionRepository;
@@ -48,6 +50,9 @@ class SecurityIntegrationTests {
 
     @Autowired
     private ClientRepository clientRepository;
+
+    @Autowired
+    private BeneficiaireRepository beneficiaireRepository;
 
     @Autowired
     private CompteRepository compteRepository;
@@ -577,6 +582,60 @@ class SecurityIntegrationTests {
             .andExpect(jsonPath("$.blocked").value(false))
             .andExpect(jsonPath("$.operationType").value("INTERNE"))
             .andExpect(jsonPath("$.blockThreshold").value(95));
+        }
+
+        @Test
+        void riskPreviewShouldIncreaseScoreForNewBeneficiary() throws Exception {
+        String token = registerAndGetToken("clientRiskBenA", "clientRiskBenA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskBenA").orElseThrow();
+
+        Beneficiaire oldBeneficiary = new Beneficiaire();
+        oldBeneficiary.setNom("Ancien Benef");
+        oldBeneficiary.setIban("FR7630001007941234567890101");
+        oldBeneficiary.setBanque("Banque Test");
+        oldBeneficiary.setEmail("ancien.benef@test.local");
+        oldBeneficiary.setClient(user.getClient());
+        oldBeneficiary.setCreatedAt(LocalDateTime.now().minusDays(3));
+        oldBeneficiary = beneficiaireRepository.save(oldBeneficiary);
+
+        Beneficiaire newBeneficiary = new Beneficiaire();
+        newBeneficiary.setNom("Nouveau Benef");
+        newBeneficiary.setIban("FR7630001007941234567890102");
+        newBeneficiary.setBanque("Banque Test");
+        newBeneficiary.setEmail("nouveau.benef@test.local");
+        newBeneficiary.setClient(user.getClient());
+        newBeneficiary.setCreatedAt(LocalDateTime.now());
+        newBeneficiary = beneficiaireRepository.save(newBeneficiary);
+
+        JsonNode oldRisk = objectMapper.readTree(
+            mockMvc.perform(get("/api/transactions/me/risk-preview")
+                    .queryParam("montant", "1000")
+                    .queryParam("type", "EXTERNE")
+                    .queryParam("beneficiaireId", oldBeneficiary.getId().toString())
+                    .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newBeneficiary").value(false))
+                .andExpect(jsonPath("$.newBeneficiaryScore").value(0))
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+        );
+
+        JsonNode newRisk = objectMapper.readTree(
+            mockMvc.perform(get("/api/transactions/me/risk-preview")
+                    .queryParam("montant", "1000")
+                    .queryParam("type", "EXTERNE")
+                    .queryParam("beneficiaireId", newBeneficiary.getId().toString())
+                    .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newBeneficiary").value(true))
+                .andExpect(jsonPath("$.newBeneficiaryScore").value(15))
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+        );
+
+        assertThat(newRisk.get("score").asInt()).isGreaterThan(oldRisk.get("score").asInt());
         }
 
         @Test

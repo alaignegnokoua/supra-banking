@@ -27,7 +27,7 @@ public interface TransactionService {
 
     TransferLimitStatusDTO getMyTransferLimits();
 
-    TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant, String operationType);
+    TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant, String operationType, Long beneficiaireId);
 
     Page<OperationAuditDTO> getMyTransferAuditHistory(Pageable pageable);
 

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +48,7 @@ public class BeneficiaireServiceImpl implements BeneficiaireService {
         Beneficiaire entity = new Beneficiaire();
         applyDto(entity, dto);
         entity.setClient(client);
+        entity.setCreatedAt(LocalDateTime.now());
 
         return toDto(beneficiaireRepository.save(entity));
     }
