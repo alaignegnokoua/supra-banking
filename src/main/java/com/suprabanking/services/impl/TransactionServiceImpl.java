@@ -1,30 +1,35 @@
 package com.suprabanking.services.impl;
 
-import com.suprabanking.config.security.CurrentUserService;
-import com.suprabanking.models.Beneficiaire;
-import com.suprabanking.models.Client;
-import com.suprabanking.models.Compte;
-import com.suprabanking.models.Transaction;
-import com.suprabanking.repositories.BeneficiaireRepository;
-import com.suprabanking.repositories.ClientRepository;
-import com.suprabanking.repositories.CompteRepository;
-import com.suprabanking.repositories.TransactionRepository;
-import com.suprabanking.services.TransactionService;
-import com.suprabanking.services.dto.TransactionDTO;
-import com.suprabanking.services.dto.VirementExterneRequest;
-import com.suprabanking.services.dto.VirementInterneRequest;
-import com.suprabanking.services.mapper.TransactionMapper;
-import com.suprabanking.web.errors.ResourceNotFoundException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
+import com.suprabanking.config.security.CurrentUserService;
+import com.suprabanking.models.Beneficiaire;
+import com.suprabanking.models.Client;
+import com.suprabanking.models.Compte;
+import com.suprabanking.models.OperationAudit;
+import com.suprabanking.models.Transaction;
+import com.suprabanking.repositories.BeneficiaireRepository;
+import com.suprabanking.repositories.ClientRepository;
+import com.suprabanking.repositories.CompteRepository;
+import com.suprabanking.repositories.OperationAuditRepository;
+import com.suprabanking.repositories.TransactionRepository;
+import com.suprabanking.services.NotificationService;
+import com.suprabanking.services.TransactionService;
+import com.suprabanking.services.dto.TransactionDTO;
+import com.suprabanking.services.dto.VirementExterneRequest;
+import com.suprabanking.services.dto.VirementInterneRequest;
+import com.suprabanking.services.mapper.TransactionMapper;
+import com.suprabanking.web.errors.ResourceNotFoundException;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +39,9 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
     private final BeneficiaireRepository beneficiaireRepository;
     private final CompteRepository compteRepository;
+    private final OperationAuditRepository operationAuditRepository;
     private final ClientRepository clientRepository;
+    private final NotificationService notificationService;
     private final TransactionMapper transactionMapper;
     private final CurrentUserService currentUserService;
 
@@ -121,12 +128,13 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional
     public void effectuerVirementInterne(VirementInterneRequest request) {
         log.debug("Request to process internal transfer: {}", request);
+        Long clientId = currentUserService.requireCurrentClientId();
 
         if (request.getCompteSourceId().equals(request.getCompteDestinationId())) {
+            saveAudit("VIREMENT_INTERNE", "ECHEC", "Comptes identiques", clientId,
+                    request.getCompteSourceId(), request.getCompteDestinationId(), null, request.getMontant());
             throw new IllegalArgumentException("Le compte source et le compte destination doivent être différents");
         }
-
-        Long clientId = currentUserService.requireCurrentClientId();
 
         Compte compteSource = compteRepository.findById(request.getCompteSourceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Compte source introuvable"));
@@ -136,10 +144,14 @@ public class TransactionServiceImpl implements TransactionService {
 
         if (compteSource.getClient() == null || !clientId.equals(compteSource.getClient().getId())
                 || compteDestination.getClient() == null || !clientId.equals(compteDestination.getClient().getId())) {
+            saveAudit("VIREMENT_INTERNE", "ECHEC", "Accès refusé à l'un des comptes", clientId,
+                    request.getCompteSourceId(), request.getCompteDestinationId(), null, request.getMontant());
             throw new AccessDeniedException("Accès refusé à l'un des comptes");
         }
 
         if (compteSource.getSolde() == null || compteSource.getSolde() < request.getMontant()) {
+            saveAudit("VIREMENT_INTERNE", "ECHEC", "Solde insuffisant", clientId,
+                    request.getCompteSourceId(), request.getCompteDestinationId(), null, request.getMontant());
             throw new IllegalArgumentException("Solde insuffisant pour effectuer ce virement");
         }
 
@@ -174,6 +186,12 @@ public class TransactionServiceImpl implements TransactionService {
 
         transactionRepository.save(debit);
         transactionRepository.save(credit);
+
+        saveAudit("VIREMENT_INTERNE", "SUCCES", "Virement interne effectué", clientId,
+            request.getCompteSourceId(), request.getCompteDestinationId(), null, request.getMontant());
+
+        notificationService.createForClient(clientId, "Virement interne effectué : " + request.getMontant()
+            + " de " + compteSource.getNumeroCompte() + " vers " + compteDestination.getNumeroCompte());
     }
 
     @Override
@@ -187,6 +205,8 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Compte source introuvable"));
 
         if (compteSource.getClient() == null || !clientId.equals(compteSource.getClient().getId())) {
+            saveAudit("VIREMENT_EXTERNE", "ECHEC", "Accès refusé au compte source", clientId,
+                    request.getCompteSourceId(), null, request.getBeneficiaireId(), request.getMontant());
             throw new AccessDeniedException("Accès refusé au compte source");
         }
 
@@ -194,6 +214,8 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Bénéficiaire introuvable"));
 
         if (compteSource.getSolde() == null || compteSource.getSolde() < request.getMontant()) {
+            saveAudit("VIREMENT_EXTERNE", "ECHEC", "Solde insuffisant", clientId,
+                    request.getCompteSourceId(), null, request.getBeneficiaireId(), request.getMontant());
             throw new IllegalArgumentException("Solde insuffisant pour effectuer ce virement externe");
         }
 
@@ -217,6 +239,12 @@ public class TransactionServiceImpl implements TransactionService {
         debit.setCompte(compteSource);
 
         transactionRepository.save(debit);
+
+        saveAudit("VIREMENT_EXTERNE", "SUCCES", "Virement externe effectué", clientId,
+            request.getCompteSourceId(), null, request.getBeneficiaireId(), request.getMontant());
+
+        notificationService.createForClient(clientId, "Virement externe effectué : " + request.getMontant()
+            + " vers " + beneficiaire.getNom());
     }
 
     @Override
@@ -281,5 +309,28 @@ public class TransactionServiceImpl implements TransactionService {
     public void delete(Long id) {
         log.debug("Request to delete Transaction : {}", id);
         transactionRepository.deleteById(id);
+    }
+
+    private void saveAudit(
+            String operationType,
+            String status,
+            String message,
+            Long clientId,
+            Long compteSourceId,
+            Long compteDestinationId,
+            Long beneficiaireId,
+            Double montant
+    ) {
+        OperationAudit audit = new OperationAudit();
+        audit.setOperationType(operationType);
+        audit.setStatus(status);
+        audit.setMessage(message);
+        audit.setCreatedAt(LocalDateTime.now());
+        audit.setClientId(clientId);
+        audit.setCompteSourceId(compteSourceId);
+        audit.setCompteDestinationId(compteDestinationId);
+        audit.setBeneficiaireId(beneficiaireId);
+        audit.setMontant(montant);
+        operationAuditRepository.save(audit);
     }
 }
