@@ -5,6 +5,7 @@ import com.suprabanking.models.Client;
 import com.suprabanking.models.Notification;
 import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.NotificationRepository;
+import com.suprabanking.services.EmailNotificationService;
 import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.dto.NotificationDTO;
 import com.suprabanking.web.errors.ResourceNotFoundException;
@@ -26,6 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final ClientRepository clientRepository;
+    private final EmailNotificationService emailNotificationService;
     private final CurrentUserService currentUserService;
 
     @Override
@@ -86,15 +88,18 @@ public class NotificationServiceImpl implements NotificationService {
 
         if (Boolean.FALSE.equals(client.getNotificationsInAppEnabled())) {
             log.debug("In-app notifications disabled for client {}, skipping notification creation", clientId);
-            return;
+        } else {
+            Notification notification = new Notification();
+            notification.setContenu(contenu);
+            notification.setDateEnvoi(LocalDateTime.now());
+            notification.setStatut(STATUT_NON_LU);
+            notification.setClient(client);
+            notificationRepository.save(notification);
         }
 
-        Notification notification = new Notification();
-        notification.setContenu(contenu);
-        notification.setDateEnvoi(LocalDateTime.now());
-        notification.setStatut(STATUT_NON_LU);
-        notification.setClient(client);
-        notificationRepository.save(notification);
+        if (Boolean.TRUE.equals(client.getNotificationsEmailEnabled())) {
+            emailNotificationService.sendNotificationEmail(client, contenu);
+        }
     }
 
     private NotificationDTO toDto(Notification n) {
