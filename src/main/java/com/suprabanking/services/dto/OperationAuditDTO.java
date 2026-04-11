@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -24,4 +25,8 @@ public class OperationAuditDTO implements Serializable {
     private Long compteDestinationId;
     private Long beneficiaireId;
     private Double montant;
+    private Integer riskScore;
+    private String riskLevel;
+    private Boolean riskBlocked;
+    private Map<String, Object> riskDetails;
 }

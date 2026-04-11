@@ -25,6 +25,8 @@ import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
+import com.suprabanking.services.dto.OperationAuditDTO;
+import com.suprabanking.services.dto.OperationAuditDTO;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -72,6 +74,12 @@ public class TransactionResource {
     ) {
         log.debug("REST request to get transfer risk preview for montant={}, type={}", montant, type);
         return transactionService.getMyTransferRiskPreview(montant, type);
+    }
+
+    @GetMapping("/me/audit")
+    public Page<OperationAuditDTO> getMyTransferAuditHistory(Pageable pageable) {
+        log.debug("REST request to get current client transfer audit history");
+        return transactionService.getMyTransferAuditHistory(pageable);
     }
 
     @GetMapping("/{id}")

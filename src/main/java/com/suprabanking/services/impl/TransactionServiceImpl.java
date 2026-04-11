@@ -29,6 +29,8 @@ import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
+import com.suprabanking.services.dto.OperationAuditDTO;
+import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.mapper.TransactionMapper;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 
@@ -385,6 +387,20 @@ public class TransactionServiceImpl implements TransactionService {
             Long beneficiaireId,
             Double montant
     ) {
+        saveAudit(operationType, status, message, clientId, compteSourceId, compteDestinationId, beneficiaireId, montant, null);
+    }
+
+    private void saveAudit(
+            String operationType,
+            String status,
+            String message,
+            Long clientId,
+            Long compteSourceId,
+            Long compteDestinationId,
+            Long beneficiaireId,
+            Double montant,
+            TransferRiskAssessmentDTO risk
+    ) {
         OperationAudit audit = new OperationAudit();
         audit.setOperationType(operationType);
         audit.setStatus(status);
@@ -395,6 +411,25 @@ public class TransactionServiceImpl implements TransactionService {
         audit.setCompteDestinationId(compteDestinationId);
         audit.setBeneficiaireId(beneficiaireId);
         audit.setMontant(montant);
+        
+        if (risk != null) {
+            audit.setRiskScore(risk.getScore());
+            audit.setRiskLevel(risk.getLevel());
+            audit.setRiskBlocked(risk.getBlocked());
+            
+            // Store risk details as a map
+            java.util.Map<String, Object> riskDetails = new java.util.HashMap<>();
+            riskDetails.put("operationType", risk.getOperationType());
+            riskDetails.put("blockThreshold", risk.getBlockThreshold());
+            riskDetails.put("amountRatio", risk.getAmountRatio());
+            riskDetails.put("dailyAmountRatio", risk.getDailyAmountRatio());
+            riskDetails.put("dailyCountRatio", risk.getDailyCountRatio());
+            riskDetails.put("amountScore", risk.getAmountScore());
+            riskDetails.put("dailyAmountScore", risk.getDailyAmountScore());
+            riskDetails.put("dailyCountScore", risk.getDailyCountScore());
+            audit.setRiskDetails(riskDetails);
+        }
+        
         operationAuditRepository.save(audit);
     }
 
@@ -419,7 +454,7 @@ public class TransactionServiceImpl implements TransactionService {
         TransferRiskAssessmentDTO risk = assessTransferRisk(clientId, montant, operationType);
         if (Boolean.TRUE.equals(risk.getBlocked())) {
             saveAudit(operationType, "ECHEC", "Risque élevé détecté: score=" + risk.getScore(), clientId,
-                compteSourceId, compteDestinationId, beneficiaireId, montant);
+                compteSourceId, compteDestinationId, beneficiaireId, montant, risk);
             throw new IllegalArgumentException(risk.getMessage());
         }
 
@@ -567,5 +602,27 @@ public class TransactionServiceImpl implements TransactionService {
             return 0.0;
         }
         return Math.min(1.0, value / max);
+    }
+
+    @Override
+    public Page<OperationAuditDTO> getMyTransferAuditHistory(Pageable pageable) {
+        Long clientId = currentUserService.requireCurrentClientId();
+        return operationAuditRepository.findByClientIdOrderByCreatedAtDesc(clientId, pageable)
+                .map(audit -> new OperationAuditDTO(
+                        audit.getId(),
+                        audit.getOperationType(),
+                        audit.getStatus(),
+                        audit.getMessage(),
+                        audit.getCreatedAt(),
+                        audit.getClientId(),
+                        audit.getCompteSourceId(),
+                        audit.getCompteDestinationId(),
+                        audit.getBeneficiaireId(),
+                        audit.getMontant(),
+                        audit.getRiskScore(),
+                        audit.getRiskLevel(),
+                        audit.getRiskBlocked(),
+                        audit.getRiskDetails()
+                ));
     }
 }

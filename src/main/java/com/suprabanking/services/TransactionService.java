@@ -11,6 +11,7 @@ import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
+import com.suprabanking.services.dto.OperationAuditDTO;
 
 public interface TransactionService {
 
@@ -27,6 +28,8 @@ public interface TransactionService {
     TransferLimitStatusDTO getMyTransferLimits();
 
     TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant, String operationType);
+
+    Page<OperationAuditDTO> getMyTransferAuditHistory(Pageable pageable);
 
     Page<TransactionDTO> findAllTransactions(Pageable pageable);
 

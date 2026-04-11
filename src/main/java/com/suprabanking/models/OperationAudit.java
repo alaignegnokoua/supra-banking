@@ -5,9 +5,12 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
 @Getter
@@ -47,4 +50,17 @@ public class OperationAudit implements Serializable {
 
     @Column(name = "montant")
     private Double montant;
+
+    @Column(name = "risk_score")
+    private Integer riskScore;
+
+    @Column(name = "risk_level")
+    private String riskLevel;
+
+    @Column(name = "risk_blocked")
+    private Boolean riskBlocked;
+
+    @Column(name = "risk_details", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> riskDetails;
 }

@@ -48,7 +48,11 @@ public class OperationAuditServiceImpl implements OperationAuditService {
                 audit.getCompteSourceId(),
                 audit.getCompteDestinationId(),
                 audit.getBeneficiaireId(),
-                audit.getMontant()
+                audit.getMontant(),
+                audit.getRiskScore(),
+                audit.getRiskLevel(),
+                audit.getRiskBlocked(),
+                audit.getRiskDetails()
         );
     }
 }
