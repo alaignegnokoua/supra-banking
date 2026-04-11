@@ -32,4 +32,6 @@ public class ClientDTO implements Serializable {
 
     @NotBlank(message = "L'identifiant est obligatoire")
     private String identifiant;
+
+    private String riskProfile;
 }

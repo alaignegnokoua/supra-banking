@@ -2,6 +2,7 @@ package com.suprabanking.web.resources;
 
 import com.suprabanking.services.ClientService;
 import com.suprabanking.services.dto.ClientDTO;
+import com.suprabanking.services.dto.UpdateClientRiskProfileRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,12 @@ public class ClientResource {
     public ClientDTO partialUpdate(@PathVariable Long id, @RequestBody ClientDTO dto) {
         log.debug("REST request to partial update Client : {}", dto);
         return clientService.partialUpdateClient(dto, id);
+    }
+
+    @PatchMapping("/{id}/risk-profile")
+    public ClientDTO updateRiskProfile(@PathVariable Long id, @Valid @RequestBody UpdateClientRiskProfileRequest request) {
+        log.debug("REST request to update Client risk profile id={} profile={}", id, request.getRiskProfile());
+        return clientService.updateClientRiskProfile(id, request.getRiskProfile());
     }
 
     @DeleteMapping("/{id}")

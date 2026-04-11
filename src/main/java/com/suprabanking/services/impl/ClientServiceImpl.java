@@ -33,6 +33,9 @@ public class ClientServiceImpl implements ClientService {
         }
         Client entity = clientMapper.toEntity(dto);
         entity.setMotDePasse(null);
+        entity.setRiskProfile(entity.getRiskProfile() == null || entity.getRiskProfile().isBlank()
+            ? "STANDARD"
+            : normalizeRiskProfile(entity.getRiskProfile()));
         return clientMapper.toDto(clientRepository.save(entity));
     }
 
@@ -56,10 +59,23 @@ public class ClientServiceImpl implements ClientService {
         log.debug("Request to partial update Client : {}", dto);
         return clientRepository.findById(id)
                 .map(existing -> {
+                    if (dto.getRiskProfile() != null) {
+                        existing.setRiskProfile(normalizeRiskProfile(dto.getRiskProfile()));
+                    }
                     clientMapper.partialUpdate(existing, dto);
                     return clientMapper.toDto(clientRepository.save(existing));
                 })
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found with id=" + id));
+    }
+
+    @Override
+    public ClientDTO updateClientRiskProfile(Long id, String riskProfile) {
+        log.debug("Request to update Client risk profile id={}, riskProfile={}", id, riskProfile);
+        Client entity = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id=" + id));
+
+        entity.setRiskProfile(normalizeRiskProfile(riskProfile));
+        return clientMapper.toDto(clientRepository.save(entity));
     }
 
     @Override
@@ -78,5 +94,18 @@ public class ClientServiceImpl implements ClientService {
     public void delete(Long id) {
         log.debug("Request to delete Client : {}", id);
         clientRepository.deleteById(id);
+    }
+
+    private String normalizeRiskProfile(String riskProfile) {
+        if (riskProfile == null || riskProfile.isBlank()) {
+            throw new IllegalArgumentException("Le profil de risque est obligatoire");
+        }
+
+        String normalized = riskProfile.trim().toUpperCase();
+        if (!"SENSIBLE".equals(normalized) && !"STANDARD".equals(normalized) && !"VIP".equals(normalized)) {
+            throw new IllegalArgumentException("Profil de risque invalide (valeurs autorisées: SENSIBLE, STANDARD, VIP)");
+        }
+
+        return normalized;
     }
 }

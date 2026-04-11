@@ -40,5 +40,8 @@ public class ClientMapperImpl implements ClientMapper {
         if (dto.getIdentifiant() != null) {
             entity.setIdentifiant(dto.getIdentifiant());
         }
+        if (dto.getRiskProfile() != null) {
+            entity.setRiskProfile(dto.getRiskProfile());
+        }
     }
 }

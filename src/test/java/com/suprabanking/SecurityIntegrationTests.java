@@ -95,6 +95,47 @@ class SecurityIntegrationTests {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void adminShouldUpdateClientRiskProfile() throws Exception {
+        registerAndGetToken("clientRiskProfileAdmin", "clientRiskProfileAdmin@test.local", "Secret123!");
+        User clientUser = userRepository.findByUsername("clientRiskProfileAdmin").orElseThrow();
+
+        String adminToken = loginAndGetToken("admin", "Admin123!");
+
+        String payload = """
+            {
+              "riskProfile": "VIP"
+            }
+            """;
+
+        mockMvc.perform(patch("/api/clients/" + clientUser.getClient().getId() + "/risk-profile")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(clientUser.getClient().getId()))
+            .andExpect(jsonPath("$.riskProfile").value("VIP"));
+    }
+
+    @Test
+    void clientShouldNotUpdateClientRiskProfile() throws Exception {
+        String clientToken = registerAndGetToken("clientRiskForbiddenA", "clientRiskForbiddenA@test.local", "Secret123!");
+        registerAndGetToken("clientRiskForbiddenB", "clientRiskForbiddenB@test.local", "Secret123!");
+        User otherUser = userRepository.findByUsername("clientRiskForbiddenB").orElseThrow();
+
+        String payload = """
+            {
+              "riskProfile": "SENSIBLE"
+            }
+            """;
+
+        mockMvc.perform(patch("/api/clients/" + otherUser.getClient().getId() + "/risk-profile")
+                .header("Authorization", "Bearer " + clientToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isForbidden());
+    }
+
         @Test
         void currentUserEndpointShouldReturnClientProfileFields() throws Exception {
         String token = registerAndGetToken("clientProfile", "clientProfile@test.local", "Secret123!");
@@ -1004,6 +1045,24 @@ class SecurityIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
+        return jsonNode.get("token").asText();
+    }
+
+    private String loginAndGetToken(String username, String password) throws Exception {
+        String payload = """
+                {
+                  "username": "%s",
+                  "password": "%s"
+                }
+                """.formatted(username, password);
+
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
                 .andReturn();
 
         JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());

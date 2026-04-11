@@ -14,6 +14,8 @@ public interface ClientService {
 
     ClientDTO partialUpdateClient(ClientDTO clientDTO, Long id);
 
+    ClientDTO updateClientRiskProfile(Long id, String riskProfile);
+
     Page<ClientDTO> findAllClients(Pageable pageable);
 
     Optional<ClientDTO> findOne(Long id);
