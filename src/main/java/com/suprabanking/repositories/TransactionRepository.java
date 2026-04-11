@@ -74,4 +74,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
         );
+
+                @Query("""
+                        select max(t.dateTransaction)
+                        from Transaction t
+                        where t.client.id = :clientId
+                            and (
+                                        lower(t.type) = 'virement_externe'
+                                        or (lower(t.type) = 'virement' and lower(t.description) like '%débit vers%')
+                                    )
+                        """)
+                LocalDateTime findLastOutgoingTransferAt(@Param("clientId") Long clientId);
 }

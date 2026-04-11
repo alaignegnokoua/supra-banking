@@ -441,11 +441,13 @@ class SecurityIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.maxSingleAmount").value(10000.0))
             .andExpect(jsonPath("$.maxDailyTotal").value(15000.0))
-            .andExpect(jsonPath("$.maxDailyCount").value(1))
+            .andExpect(jsonPath("$.maxDailyCount").value(10))
+            .andExpect(jsonPath("$.minIntervalSeconds").value(120))
             .andExpect(jsonPath("$.todayOutgoingTotal").value(0.0))
             .andExpect(jsonPath("$.remainingDailyAmount").value(15000.0))
             .andExpect(jsonPath("$.todayOutgoingCount").value(0))
-            .andExpect(jsonPath("$.remainingDailyCount").value(1));
+            .andExpect(jsonPath("$.remainingDailyCount").value(10))
+            .andExpect(jsonPath("$.remainingCooldownSeconds").value(0));
         }
 
         @Test
@@ -461,14 +463,16 @@ class SecurityIntegrationTests {
         source.setClient(user.getClient());
         source = compteRepository.save(source);
 
-        Transaction existingOutgoing = new Transaction();
-        existingOutgoing.setType("virement_externe");
-        existingOutgoing.setMontant(100.0);
-        existingOutgoing.setDateTransaction(LocalDateTime.now());
-        existingOutgoing.setDescription("Virement externe déjà effectué");
-        existingOutgoing.setClient(user.getClient());
-        existingOutgoing.setCompte(source);
-        transactionRepository.save(existingOutgoing);
+        for (int i = 0; i < 10; i++) {
+            Transaction existingOutgoing = new Transaction();
+            existingOutgoing.setType("virement_externe");
+            existingOutgoing.setMontant(100.0 + i);
+            existingOutgoing.setDateTransaction(LocalDateTime.now().minusMinutes(30 + i));
+            existingOutgoing.setDescription("Virement externe déjà effectué " + i);
+            existingOutgoing.setClient(user.getClient());
+            existingOutgoing.setCompte(source);
+            transactionRepository.save(existingOutgoing);
+        }
 
         String payloadBeneficiaire = """
             {
@@ -503,6 +507,63 @@ class SecurityIntegrationTests {
                 .content(payloadTransfer))
             .andExpect(status().isBadRequest())
             .andExpect(content().string(containsString("Nombre maximal de virements journaliers atteint")));
+        }
+
+        @Test
+        void clientShouldNotProcessExternalTransferWhenCooldownIsActive() throws Exception {
+        String token = registerAndGetToken("clientLimitCooldown", "clientLimitCooldown@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientLimitCooldown").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("LIM-COOLDOWN-SRC");
+        source.setType("courant");
+        source.setSolde(50000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Transaction existingOutgoing = new Transaction();
+        existingOutgoing.setType("virement_externe");
+        existingOutgoing.setMontant(100.0);
+        existingOutgoing.setDateTransaction(LocalDateTime.now());
+        existingOutgoing.setDescription("Virement externe très récent");
+        existingOutgoing.setClient(user.getClient());
+        existingOutgoing.setCompte(source);
+        transactionRepository.save(existingOutgoing);
+
+        String payloadBeneficiaire = """
+            {
+              "nom": "Prestataire Cooldown",
+              "iban": "FR7630001007941234567890198",
+              "banque": "Banque Externe",
+              "email": "cooldown@test.local"
+            }
+            """;
+
+        MvcResult benResult = mockMvc.perform(post("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadBeneficiaire))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        Long beneficiaireId = objectMapper.readTree(benResult.getResponse().getContentAsString()).get("id").asLong();
+
+        String payloadTransfer = """
+            {
+              "compteSourceId": %d,
+              "beneficiaireId": %d,
+              "montant": 50,
+              "description": "Test délai minimal"
+            }
+            """.formatted(source.getId(), beneficiaireId);
+
+        mockMvc.perform(post("/api/transactions/me/virement-externe")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadTransfer))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(containsString("Veuillez attendre")));
         }
 
         @Test

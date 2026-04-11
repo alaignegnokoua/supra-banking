@@ -1,6 +1,7 @@
 package com.suprabanking.services.impl;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -55,6 +56,9 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Value("${app.transfers.max-daily-count:10}")
     private Integer maxDailyTransferCount;
+
+    @Value("${app.transfers.min-interval-seconds:30}")
+    private Integer minTransferIntervalSeconds;
 
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
@@ -282,6 +286,7 @@ public class TransactionServiceImpl implements TransactionService {
         Double todayOutgoingTotal = getTodayOutgoingTotal(clientId);
         Long todayOutgoingCountLong = getTodayOutgoingCount(clientId);
         int todayOutgoingCount = todayOutgoingCountLong == null ? 0 : todayOutgoingCountLong.intValue();
+        int remainingCooldownSeconds = getRemainingCooldownSeconds(clientId);
 
         double effectiveDailyMax = maxDailyTransferTotal == null ? 0.0 : maxDailyTransferTotal;
         double remainingDailyAmount = Math.max(0.0, effectiveDailyMax - todayOutgoingTotal);
@@ -292,10 +297,12 @@ public class TransactionServiceImpl implements TransactionService {
                 maxSingleTransferAmount,
                 maxDailyTransferTotal,
             maxDailyTransferCount,
+                minTransferIntervalSeconds,
                 todayOutgoingTotal,
             remainingDailyAmount,
             todayOutgoingCount,
-            remainingDailyCount
+                remainingDailyCount,
+                remainingCooldownSeconds
         );
     }
 
@@ -409,6 +416,14 @@ public class TransactionServiceImpl implements TransactionService {
                     compteSourceId, compteDestinationId, beneficiaireId, montant);
             throw new IllegalArgumentException("Nombre maximal de virements journaliers atteint");
         }
+
+        int remainingCooldownSeconds = getRemainingCooldownSeconds(clientId);
+        if (remainingCooldownSeconds > 0) {
+            saveAudit(operationType, "ECHEC", "Délai minimal entre virements non respecté", clientId,
+                compteSourceId, compteDestinationId, beneficiaireId, montant);
+            throw new IllegalArgumentException("Veuillez attendre " + remainingCooldownSeconds
+                + " secondes avant d'effectuer un nouveau virement");
+        }
     }
 
     private Double getTodayOutgoingTotal(Long clientId) {
@@ -423,5 +438,20 @@ public class TransactionServiceImpl implements TransactionService {
         LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
         Long count = transactionRepository.countDailyOutgoingTransfers(clientId, startOfDay, endOfDay);
         return count == null ? 0L : count;
+    }
+
+    private int getRemainingCooldownSeconds(Long clientId) {
+        if (minTransferIntervalSeconds == null || minTransferIntervalSeconds <= 0) {
+            return 0;
+        }
+
+        LocalDateTime lastOutgoingTransferAt = transactionRepository.findLastOutgoingTransferAt(clientId);
+        if (lastOutgoingTransferAt == null) {
+            return 0;
+        }
+
+        long elapsedSeconds = ChronoUnit.SECONDS.between(lastOutgoingTransferAt, LocalDateTime.now());
+        long remainingSeconds = (long) minTransferIntervalSeconds - elapsedSeconds;
+        return (int) Math.max(0L, remainingSeconds);
     }
 }
