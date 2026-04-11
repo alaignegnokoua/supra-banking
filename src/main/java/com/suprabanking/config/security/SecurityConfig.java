@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/auth/me/profile").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/auth/me/password").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/auth/me/preferences").authenticated()
 
                 .requestMatchers(HttpMethod.GET, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.POST, "/api/amplitude-data/**").hasAnyRole("ADMIN", "AGENT")

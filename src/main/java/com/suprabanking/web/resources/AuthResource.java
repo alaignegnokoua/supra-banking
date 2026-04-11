@@ -6,6 +6,7 @@ import com.suprabanking.services.dto.auth.ChangePasswordRequest;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
+import com.suprabanking.services.dto.auth.UpdateNotificationPreferencesRequest;
 import com.suprabanking.services.dto.auth.UpdateProfileRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -57,5 +58,13 @@ public class AuthResource {
                                                @Valid @RequestBody ChangePasswordRequest request) {
         authService.changeCurrentUserPassword(principal.getName(), request);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/me/preferences")
+    public ResponseEntity<CurrentUserResponse> updatePreferences(Principal principal,
+                                                                 @RequestBody UpdateNotificationPreferencesRequest request) {
+        return ResponseEntity.ok(
+                authService.updateCurrentUserNotificationPreferences(principal.getName(), request)
+        );
     }
 }

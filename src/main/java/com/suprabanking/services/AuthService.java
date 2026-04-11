@@ -12,6 +12,7 @@ import com.suprabanking.services.dto.auth.ChangePasswordRequest;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
+import com.suprabanking.services.dto.auth.UpdateNotificationPreferencesRequest;
 import com.suprabanking.services.dto.auth.UpdateProfileRequest;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,8 @@ public class AuthService {
         client.setTelephone("N/A");
         client.setIdentifiant(request.getUsername());
         client.setMotDePasse(passwordEncoder.encode(request.getPassword()));
+        client.setNotificationsInAppEnabled(true);
+        client.setNotificationsEmailEnabled(false);
         client = clientRepository.save(client);
 
         User user = new User();
@@ -102,6 +105,8 @@ public class AuthService {
             .clientPrenom(client != null ? client.getPrenom() : null)
             .clientEmail(client != null ? client.getEmail() : null)
             .clientTelephone(client != null ? client.getTelephone() : null)
+            .notificationsInAppEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsInAppEnabled()))
+            .notificationsEmailEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsEmailEnabled()))
                 .build();
     }
 
@@ -156,6 +161,25 @@ public class AuthService {
             client.setMotDePasse(encoded);
             clientRepository.save(client);
         }
+    }
+
+    public CurrentUserResponse updateCurrentUserNotificationPreferences(
+            String username,
+            UpdateNotificationPreferencesRequest request
+    ) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        Client client = user.getClient();
+        if (client == null) {
+            throw new ResourceNotFoundException("Profil client introuvable");
+        }
+
+        client.setNotificationsInAppEnabled(request.isNotificationsInAppEnabled());
+        client.setNotificationsEmailEnabled(request.isNotificationsEmailEnabled());
+        clientRepository.save(client);
+
+        return getCurrentUser(username);
     }
 
     private AuthResponse buildAuthResponse(User user) {

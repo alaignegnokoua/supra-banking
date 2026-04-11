@@ -41,6 +41,12 @@ public class Client implements Serializable {
     @Column(name = "mot_de_passe")
     private String motDePasse;
 
+    @Column(name = "notifications_in_app_enabled")
+    private Boolean notificationsInAppEnabled;
+
+    @Column(name = "notifications_email_enabled")
+    private Boolean notificationsEmailEnabled;
+
     @OneToMany(mappedBy = "client")
     private List<Compte> comptes;
 

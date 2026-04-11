@@ -170,6 +170,26 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void currentUserShouldUpdateNotificationPreferences() throws Exception {
+        String token = registerAndGetToken("clientPrefA", "clientPrefA@test.local", "Secret123!");
+
+        String payload = """
+            {
+              "notificationsInAppEnabled": true,
+              "notificationsEmailEnabled": true
+            }
+            """;
+
+        mockMvc.perform(put("/api/auth/me/preferences")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.notificationsInAppEnabled").value(true))
+            .andExpect(jsonPath("$.notificationsEmailEnabled").value(true));
+        }
+
+        @Test
         void clientShouldBeForbiddenWhenReadingAnotherClientCompteById() throws Exception {
         String tokenUser1 = registerAndGetToken("clientOwn1", "clientOwn1@test.local", "Secret123!");
         registerAndGetToken("clientOwn2", "clientOwn2@test.local", "Secret123!");

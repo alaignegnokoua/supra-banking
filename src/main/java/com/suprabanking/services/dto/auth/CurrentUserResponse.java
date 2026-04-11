@@ -26,4 +26,6 @@ public class CurrentUserResponse {
     private String clientPrenom;
     private String clientEmail;
     private String clientTelephone;
+    private boolean notificationsInAppEnabled;
+    private boolean notificationsEmailEnabled;
 }
