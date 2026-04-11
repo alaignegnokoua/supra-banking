@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
 import com.suprabanking.services.dto.TransferLimitStatusDTO;
+import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 
@@ -62,6 +63,12 @@ public class TransactionResource {
     public TransferLimitStatusDTO getMyTransferLimits() {
         log.debug("REST request to get current client transfer limits");
         return transactionService.getMyTransferLimits();
+    }
+
+    @GetMapping("/me/risk-preview")
+    public TransferRiskAssessmentDTO getMyTransferRiskPreview(@RequestParam Double montant) {
+        log.debug("REST request to get transfer risk preview for montant={}", montant);
+        return transactionService.getMyTransferRiskPreview(montant);
     }
 
     @GetMapping("/{id}")

@@ -26,6 +26,7 @@ import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.TransactionService;
 import com.suprabanking.services.dto.TransactionDTO;
 import com.suprabanking.services.dto.TransferLimitStatusDTO;
+import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
 import com.suprabanking.services.mapper.TransactionMapper;
@@ -59,6 +60,9 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Value("${app.transfers.min-interval-seconds:30}")
     private Integer minTransferIntervalSeconds;
+
+    @Value("${app.transfers.risk-block-threshold:90}")
+    private Integer transferRiskBlockThreshold;
 
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
@@ -307,6 +311,12 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
+    public TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant) {
+        Long clientId = currentUserService.requireCurrentClientId();
+        return assessTransferRisk(clientId, montant);
+    }
+
+    @Override
     public Page<TransactionDTO> findMyTransactionsByCompte(
             Long compteId,
             String type,
@@ -399,6 +409,13 @@ public class TransactionServiceImpl implements TransactionService {
             throw new IllegalArgumentException("Montant supérieur au plafond unitaire autorisé");
         }
 
+        TransferRiskAssessmentDTO risk = assessTransferRisk(clientId, montant);
+        if (Boolean.TRUE.equals(risk.getBlocked())) {
+            saveAudit(operationType, "ECHEC", "Risque élevé détecté: score=" + risk.getScore(), clientId,
+                compteSourceId, compteDestinationId, beneficiaireId, montant);
+            throw new IllegalArgumentException(risk.getMessage());
+        }
+
         Double alreadyTransferred = getTodayOutgoingTotal(clientId);
         double totalAfterTransfer = (alreadyTransferred == null ? 0.0 : alreadyTransferred) + montant;
 
@@ -453,5 +470,34 @@ public class TransactionServiceImpl implements TransactionService {
         long elapsedSeconds = ChronoUnit.SECONDS.between(lastOutgoingTransferAt, LocalDateTime.now());
         long remainingSeconds = (long) minTransferIntervalSeconds - elapsedSeconds;
         return (int) Math.max(0L, remainingSeconds);
+    }
+
+    private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant) {
+        if (montant == null || montant <= 0) {
+            return new TransferRiskAssessmentDTO(0, "FAIBLE", false, "Risque faible");
+        }
+
+        double amountRatio = ratio(montant, maxSingleTransferAmount);
+        double dailyAmountRatio = ratio(getTodayOutgoingTotal(clientId) + montant, maxDailyTransferTotal);
+        double dailyCountRatio = ratio((double) (getTodayOutgoingCount(clientId) + 1L),
+                maxDailyTransferCount == null ? null : maxDailyTransferCount.doubleValue());
+
+        int score = (int) Math.round((amountRatio * 0.5 + dailyAmountRatio * 0.3 + dailyCountRatio * 0.2) * 100.0);
+        String level = score >= 70 ? "ELEVE" : (score >= 40 ? "MOYEN" : "FAIBLE");
+        int threshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
+        boolean blocked = score >= threshold;
+
+        String message = blocked
+                ? "Risque de fraude élevé détecté (score=" + score + ")"
+                : "Risque " + level.toLowerCase() + " (score=" + score + ")";
+
+        return new TransferRiskAssessmentDTO(score, level, blocked, message);
+    }
+
+    private double ratio(Double value, Double max) {
+        if (value == null || value <= 0 || max == null || max <= 0) {
+            return 0.0;
+        }
+        return Math.min(1.0, value / max);
     }
 }

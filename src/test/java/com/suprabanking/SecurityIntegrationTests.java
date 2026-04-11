@@ -451,6 +451,39 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void clientShouldPreviewHighTransferRisk() throws Exception {
+        String token = registerAndGetToken("clientRiskA", "clientRiskA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        for (int i = 0; i < 9; i++) {
+            Transaction existingOutgoing = new Transaction();
+            existingOutgoing.setType("virement_externe");
+            existingOutgoing.setMontant(1600.0);
+            existingOutgoing.setDateTransaction(LocalDateTime.now().minusMinutes(20 + i));
+            existingOutgoing.setDescription("Virement de risque " + i);
+            existingOutgoing.setClient(user.getClient());
+            existingOutgoing.setCompte(source);
+            transactionRepository.save(existingOutgoing);
+        }
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "10000")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.score").isNumber())
+            .andExpect(jsonPath("$.level").value("ELEVE"))
+            .andExpect(jsonPath("$.blocked").value(true));
+        }
+
+        @Test
         void clientShouldNotProcessExternalTransferWhenDailyCountLimitIsExceeded() throws Exception {
         String token = registerAndGetToken("clientLimitCount", "clientLimitCount@test.local", "Secret123!");
         User user = userRepository.findByUsername("clientLimitCount").orElseThrow();
