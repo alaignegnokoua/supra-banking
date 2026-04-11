@@ -482,6 +482,30 @@ class SecurityIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.unreadCount").value(1));
 
+        JsonNode notificationsBeforeRead = objectMapper.readTree(
+                mockMvc.perform(get("/api/notifications/me")
+                                .header("Authorization", "Bearer " + token))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        );
+        Long notificationId = notificationsBeforeRead.get(0).get("id").asLong();
+
+        mockMvc.perform(patch("/api/notifications/me/" + notificationId + "/read")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.statut").value("LU"));
+
+        mockMvc.perform(delete("/api/notifications/me/read")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/notifications/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("Virement externe effectué"))));
+
         mockMvc.perform(patch("/api/notifications/me/read-all")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isNoContent());

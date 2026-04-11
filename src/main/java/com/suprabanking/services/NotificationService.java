@@ -9,5 +9,7 @@ public interface NotificationService {
     NotificationDTO markAsRead(Long id);
     int markAllMyNotificationsAsRead();
     long countMyUnreadNotifications();
+    void deleteMyNotification(Long id);
+    long deleteMyReadNotifications();
     void createForClient(Long clientId, String contenu);
 }

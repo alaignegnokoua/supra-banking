@@ -11,6 +11,7 @@ import com.suprabanking.web.errors.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -61,6 +62,21 @@ public class NotificationServiceImpl implements NotificationService {
     public long countMyUnreadNotifications() {
         Long clientId = currentUserService.requireCurrentClientId();
         return notificationRepository.countByClientIdAndStatut(clientId, STATUT_NON_LU);
+    }
+
+    @Override
+    public void deleteMyNotification(Long id) {
+        Long clientId = currentUserService.requireCurrentClientId();
+        Notification notification = notificationRepository.findByIdAndClientId(id, clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification introuvable"));
+        notificationRepository.delete(notification);
+    }
+
+    @Override
+    @Transactional
+    public long deleteMyReadNotifications() {
+        Long clientId = currentUserService.requireCurrentClientId();
+        return notificationRepository.deleteByClientIdAndStatut(clientId, STATUT_LU);
     }
 
     @Override

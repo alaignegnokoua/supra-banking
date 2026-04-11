@@ -12,5 +12,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByClientIdOrderByDateEnvoiDesc(Long clientId);
     List<Notification> findByClientIdAndStatutOrderByDateEnvoiDesc(Long clientId, String statut);
     long countByClientIdAndStatut(Long clientId, String statut);
+    long deleteByClientIdAndStatut(Long clientId, String statut);
     Optional<Notification> findByIdAndClientId(Long id, Long clientId);
 }

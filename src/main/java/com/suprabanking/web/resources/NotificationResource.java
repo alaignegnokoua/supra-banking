@@ -42,4 +42,18 @@ public class NotificationResource {
         log.debug("REST request to get unread notifications count");
         return new NotificationUnreadCountDTO(notificationService.countMyUnreadNotifications());
     }
+
+    @DeleteMapping("/me/{id}")
+    public ResponseEntity<Void> deleteMyNotification(@PathVariable Long id) {
+        log.debug("REST request to delete my notification: {}", id);
+        notificationService.deleteMyNotification(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/me/read")
+    public ResponseEntity<Void> deleteMyReadNotifications() {
+        log.debug("REST request to delete my read notifications");
+        notificationService.deleteMyReadNotifications();
+        return ResponseEntity.noContent().build();
+    }
 }
