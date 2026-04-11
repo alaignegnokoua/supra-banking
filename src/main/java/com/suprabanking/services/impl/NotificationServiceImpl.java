@@ -68,6 +68,11 @@ public class NotificationServiceImpl implements NotificationService {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client introuvable pour notification"));
 
+        if (Boolean.FALSE.equals(client.getNotificationsInAppEnabled())) {
+            log.debug("In-app notifications disabled for client {}, skipping notification creation", clientId);
+            return;
+        }
+
         Notification notification = new Notification();
         notification.setContenu(contenu);
         notification.setDateEnvoi(LocalDateTime.now());

@@ -498,6 +498,70 @@ class SecurityIntegrationTests {
             .andExpect(content().string(containsString("SUCCES")));
         }
 
+        @Test
+        void clientShouldNotReceiveInAppNotificationWhenPreferenceIsDisabled() throws Exception {
+        String token = registerAndGetToken("clientNoNotif", "clientNoNotif@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientNoNotif").orElseThrow();
+
+        mockMvc.perform(put("/api/auth/me/preferences")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "notificationsInAppEnabled": false,
+                      "notificationsEmailEnabled": false
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.notificationsInAppEnabled").value(false));
+
+        Compte source = new Compte();
+        source.setNumeroCompte("EXT-SRC-NONOTIF");
+        source.setType("courant");
+        source.setSolde(1000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        String payloadBeneficiaire = """
+            {
+              "nom": "Prestataire Sans Notif",
+              "iban": "FR7630001007941234567890186",
+              "banque": "Banque Externe",
+              "email": "prestataire@test.local"
+            }
+            """;
+
+        MvcResult benResult = mockMvc.perform(post("/api/beneficiaires/me")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadBeneficiaire))
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        Long beneficiaireId = objectMapper.readTree(benResult.getResponse().getContentAsString()).get("id").asLong();
+
+        String payloadTransfer = """
+            {
+              "compteSourceId": %d,
+              "beneficiaireId": %d,
+              "montant": 200,
+              "description": "Paiement sans notif"
+            }
+            """.formatted(source.getId(), beneficiaireId);
+
+        mockMvc.perform(post("/api/transactions/me/virement-externe")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payloadTransfer))
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/notifications/me/unread-count")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unreadCount").value(0));
+        }
+
     private String registerAndGetToken(String username, String email, String password) throws Exception {
         String payload = """
                 {
