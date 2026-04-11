@@ -475,6 +475,12 @@ class SecurityIntegrationTests {
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("Virement externe effectué")));
+
+        mockMvc.perform(get("/api/audits/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("VIREMENT_EXTERNE")))
+            .andExpect(content().string(containsString("SUCCES")));
         }
 
     private String registerAndGetToken(String username, String email, String password) throws Exception {

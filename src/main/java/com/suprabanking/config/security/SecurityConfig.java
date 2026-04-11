@@ -80,6 +80,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notifications/me/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.PATCH, "/api/notifications/me/**").hasRole("CLIENT")
 
+                        .requestMatchers(HttpMethod.GET, "/api/audits/me/**").hasRole("CLIENT")
+
                         .requestMatchers(HttpMethod.GET, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT", "CLIENT")
                         .requestMatchers(HttpMethod.POST, "/api/transactions/me/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.POST, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT")
