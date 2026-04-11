@@ -53,6 +53,9 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.max-daily-total:15000}")
     private Double maxDailyTransferTotal;
 
+    @Value("${app.transfers.max-daily-count:10}")
+    private Integer maxDailyTransferCount;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -277,15 +280,22 @@ public class TransactionServiceImpl implements TransactionService {
     public TransferLimitStatusDTO getMyTransferLimits() {
         Long clientId = currentUserService.requireCurrentClientId();
         Double todayOutgoingTotal = getTodayOutgoingTotal(clientId);
+        Long todayOutgoingCountLong = getTodayOutgoingCount(clientId);
+        int todayOutgoingCount = todayOutgoingCountLong == null ? 0 : todayOutgoingCountLong.intValue();
 
         double effectiveDailyMax = maxDailyTransferTotal == null ? 0.0 : maxDailyTransferTotal;
         double remainingDailyAmount = Math.max(0.0, effectiveDailyMax - todayOutgoingTotal);
+        int effectiveDailyCountMax = maxDailyTransferCount == null ? 0 : maxDailyTransferCount;
+        int remainingDailyCount = Math.max(0, effectiveDailyCountMax - todayOutgoingCount);
 
         return new TransferLimitStatusDTO(
                 maxSingleTransferAmount,
                 maxDailyTransferTotal,
+            maxDailyTransferCount,
                 todayOutgoingTotal,
-                remainingDailyAmount
+            remainingDailyAmount,
+            todayOutgoingCount,
+            remainingDailyCount
         );
     }
 
@@ -390,6 +400,15 @@ public class TransactionServiceImpl implements TransactionService {
                     compteSourceId, compteDestinationId, beneficiaireId, montant);
             throw new IllegalArgumentException("Plafond journalier de virement dépassé");
         }
+
+        Long todayTransferCount = getTodayOutgoingCount(clientId);
+        long countAfterTransfer = (todayTransferCount == null ? 0L : todayTransferCount) + 1L;
+
+        if (maxDailyTransferCount != null && countAfterTransfer > maxDailyTransferCount) {
+            saveAudit(operationType, "ECHEC", "Nombre de virements journalier dépassé", clientId,
+                    compteSourceId, compteDestinationId, beneficiaireId, montant);
+            throw new IllegalArgumentException("Nombre maximal de virements journaliers atteint");
+        }
     }
 
     private Double getTodayOutgoingTotal(Long clientId) {
@@ -397,5 +416,12 @@ public class TransactionServiceImpl implements TransactionService {
         LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
         Double total = transactionRepository.sumDailyOutgoingTransfers(clientId, startOfDay, endOfDay);
         return total == null ? 0.0 : total;
+    }
+
+    private Long getTodayOutgoingCount(Long clientId) {
+        LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+        Long count = transactionRepository.countDailyOutgoingTransfers(clientId, startOfDay, endOfDay);
+        return count == null ? 0L : count;
     }
 }

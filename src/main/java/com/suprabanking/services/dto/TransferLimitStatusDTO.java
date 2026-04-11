@@ -15,6 +15,9 @@ public class TransferLimitStatusDTO implements Serializable {
 
     private Double maxSingleAmount;
     private Double maxDailyTotal;
+    private Integer maxDailyCount;
     private Double todayOutgoingTotal;
     private Double remainingDailyAmount;
+    private Integer todayOutgoingCount;
+    private Integer remainingDailyCount;
 }
