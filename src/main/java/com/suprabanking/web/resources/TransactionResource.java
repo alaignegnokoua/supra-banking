@@ -66,9 +66,12 @@ public class TransactionResource {
     }
 
     @GetMapping("/me/risk-preview")
-    public TransferRiskAssessmentDTO getMyTransferRiskPreview(@RequestParam Double montant) {
-        log.debug("REST request to get transfer risk preview for montant={}", montant);
-        return transactionService.getMyTransferRiskPreview(montant);
+    public TransferRiskAssessmentDTO getMyTransferRiskPreview(
+            @RequestParam Double montant,
+            @RequestParam(required = false, defaultValue = "EXTERNE") String type
+    ) {
+        log.debug("REST request to get transfer risk preview for montant={}, type={}", montant, type);
+        return transactionService.getMyTransferRiskPreview(montant, type);
     }
 
     @GetMapping("/{id}")

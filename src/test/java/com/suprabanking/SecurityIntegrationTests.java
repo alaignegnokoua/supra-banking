@@ -476,11 +476,51 @@ class SecurityIntegrationTests {
 
         mockMvc.perform(get("/api/transactions/me/risk-preview")
                 .queryParam("montant", "10000")
+                .queryParam("type", "EXTERNE")
                 .header("Authorization", "Bearer " + token))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.score").isNumber())
             .andExpect(jsonPath("$.level").value("ELEVE"))
             .andExpect(jsonPath("$.blocked").value(true));
+        }
+
+        @Test
+        void riskPreviewShouldDifferentiateExternalAndInternalThresholds() throws Exception {
+        String token = registerAndGetToken("clientRiskTypeA", "clientRiskTypeA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskTypeA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-TYPE-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        for (int i = 0; i < 7; i++) {
+            Transaction existingOutgoing = new Transaction();
+            existingOutgoing.setType("virement_externe");
+            existingOutgoing.setMontant(285.0);
+            existingOutgoing.setDateTransaction(LocalDateTime.now().minusMinutes(15 + i));
+            existingOutgoing.setDescription("Virement typé " + i);
+            existingOutgoing.setClient(user.getClient());
+            existingOutgoing.setCompte(source);
+            transactionRepository.save(existingOutgoing);
+        }
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "10000")
+                .queryParam("type", "EXTERNE")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blocked").value(true));
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "10000")
+                .queryParam("type", "INTERNE")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blocked").value(false));
         }
 
         @Test

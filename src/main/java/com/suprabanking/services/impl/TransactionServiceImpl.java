@@ -64,6 +64,12 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.risk-block-threshold:90}")
     private Integer transferRiskBlockThreshold;
 
+    @Value("${app.transfers.risk-block-threshold-internal:95}")
+    private Integer transferRiskBlockThresholdInternal;
+
+    @Value("${app.transfers.risk-block-threshold-external:90}")
+    private Integer transferRiskBlockThresholdExternal;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -311,9 +317,10 @@ public class TransactionServiceImpl implements TransactionService {
     }
 
     @Override
-    public TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant) {
+    public TransferRiskAssessmentDTO getMyTransferRiskPreview(Double montant, String operationType) {
         Long clientId = currentUserService.requireCurrentClientId();
-        return assessTransferRisk(clientId, montant);
+        String normalizedOperationType = normalizeOperationType(operationType);
+        return assessTransferRisk(clientId, montant, normalizedOperationType);
     }
 
     @Override
@@ -409,7 +416,7 @@ public class TransactionServiceImpl implements TransactionService {
             throw new IllegalArgumentException("Montant supérieur au plafond unitaire autorisé");
         }
 
-        TransferRiskAssessmentDTO risk = assessTransferRisk(clientId, montant);
+        TransferRiskAssessmentDTO risk = assessTransferRisk(clientId, montant, operationType);
         if (Boolean.TRUE.equals(risk.getBlocked())) {
             saveAudit(operationType, "ECHEC", "Risque élevé détecté: score=" + risk.getScore(), clientId,
                 compteSourceId, compteDestinationId, beneficiaireId, montant);
@@ -472,19 +479,29 @@ public class TransactionServiceImpl implements TransactionService {
         return (int) Math.max(0L, remainingSeconds);
     }
 
-    private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant) {
+    private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant, String operationType) {
         if (montant == null || montant <= 0) {
             return new TransferRiskAssessmentDTO(0, "FAIBLE", false, "Risque faible");
         }
+
+        String normalizedOperationType = normalizeOperationType(operationType);
+        boolean isExternal = isExternalOperation(normalizedOperationType);
 
         double amountRatio = ratio(montant, maxSingleTransferAmount);
         double dailyAmountRatio = ratio(getTodayOutgoingTotal(clientId) + montant, maxDailyTransferTotal);
         double dailyCountRatio = ratio((double) (getTodayOutgoingCount(clientId) + 1L),
                 maxDailyTransferCount == null ? null : maxDailyTransferCount.doubleValue());
 
-        int score = (int) Math.round((amountRatio * 0.5 + dailyAmountRatio * 0.3 + dailyCountRatio * 0.2) * 100.0);
+        double weightedScore = isExternal
+                ? (amountRatio * 0.6 + dailyAmountRatio * 0.25 + dailyCountRatio * 0.15)
+                : (amountRatio * 0.4 + dailyAmountRatio * 0.4 + dailyCountRatio * 0.2);
+
+        int score = (int) Math.round(weightedScore * 100.0);
         String level = score >= 70 ? "ELEVE" : (score >= 40 ? "MOYEN" : "FAIBLE");
-        int threshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
+        int defaultThreshold = transferRiskBlockThreshold == null ? 90 : transferRiskBlockThreshold;
+        int threshold = isExternal
+                ? (transferRiskBlockThresholdExternal == null ? defaultThreshold : transferRiskBlockThresholdExternal)
+                : (transferRiskBlockThresholdInternal == null ? defaultThreshold : transferRiskBlockThresholdInternal);
         boolean blocked = score >= threshold;
 
         String message = blocked
@@ -492,6 +509,23 @@ public class TransactionServiceImpl implements TransactionService {
                 : "Risque " + level.toLowerCase() + " (score=" + score + ")";
 
         return new TransferRiskAssessmentDTO(score, level, blocked, message);
+    }
+
+    private String normalizeOperationType(String operationType) {
+        if (operationType == null || operationType.isBlank()) {
+            return "EXTERNE";
+        }
+
+        String raw = operationType.trim().toUpperCase();
+        if (raw.contains("INTERNE")) {
+            return "INTERNE";
+        }
+
+        return "EXTERNE";
+    }
+
+    private boolean isExternalOperation(String normalizedOperationType) {
+        return "EXTERNE".equals(normalizedOperationType) || "VIREMENT_EXTERNE".equals(normalizedOperationType);
     }
 
     private double ratio(Double value, Double max) {
