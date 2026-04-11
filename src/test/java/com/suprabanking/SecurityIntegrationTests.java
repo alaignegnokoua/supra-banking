@@ -639,6 +639,19 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void riskPreviewShouldExposeUnusualHourSignal() throws Exception {
+        String token = registerAndGetToken("clientRiskHourA", "clientRiskHourA@test.local", "Secret123!");
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "1000")
+                .queryParam("type", "INTERNE")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unusualHour").value(true))
+            .andExpect(jsonPath("$.unusualHourScore").value(0));
+        }
+
+        @Test
         void riskPreviewShouldAdaptThresholdToClientRiskProfile() throws Exception {
         String token = registerAndGetToken("clientRiskProfileA", "clientRiskProfileA@test.local", "Secret123!");
         User user = userRepository.findByUsername("clientRiskProfileA").orElseThrow();

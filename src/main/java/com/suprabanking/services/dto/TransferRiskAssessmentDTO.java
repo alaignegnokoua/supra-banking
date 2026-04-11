@@ -28,4 +28,6 @@ public class TransferRiskAssessmentDTO implements Serializable {
     private Integer dailyCountScore;
     private Boolean newBeneficiary;
     private Integer newBeneficiaryScore;
+    private Boolean unusualHour;
+    private Integer unusualHourScore;
 }

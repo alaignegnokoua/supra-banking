@@ -1,6 +1,7 @@
 package com.suprabanking.services.impl;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
@@ -94,6 +95,18 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Value("${app.transfers.risk-new-beneficiary-score-external:15}")
     private Integer newBeneficiaryScoreExternal;
+
+    @Value("${app.transfers.risk-unusual-hour-start:22}")
+    private Integer unusualHourStart;
+
+    @Value("${app.transfers.risk-unusual-hour-end:6}")
+    private Integer unusualHourEnd;
+
+    @Value("${app.transfers.risk-unusual-hour-score-external:10}")
+    private Integer unusualHourScoreExternal;
+
+    @Value("${app.transfers.risk-unusual-hour-score-internal:5}")
+    private Integer unusualHourScoreInternal;
 
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
@@ -453,6 +466,8 @@ public class TransactionServiceImpl implements TransactionService {
             riskDetails.put("dailyCountScore", risk.getDailyCountScore());
             riskDetails.put("newBeneficiary", risk.getNewBeneficiary());
             riskDetails.put("newBeneficiaryScore", risk.getNewBeneficiaryScore());
+            riskDetails.put("unusualHour", risk.getUnusualHour());
+            riskDetails.put("unusualHourScore", risk.getUnusualHourScore());
             audit.setRiskDetails(riskDetails);
         }
         
@@ -558,6 +573,12 @@ public class TransactionServiceImpl implements TransactionService {
         int beneficiaryScore = newBeneficiary
                 ? (newBeneficiaryScoreExternal == null ? 15 : newBeneficiaryScoreExternal)
                 : 0;
+        boolean unusualHour = isUnusualHour(LocalDateTime.now().toLocalTime());
+        int unusualHourScore = unusualHour
+            ? (isExternal
+                ? (unusualHourScoreExternal == null ? 10 : unusualHourScoreExternal)
+                : (unusualHourScoreInternal == null ? 5 : unusualHourScoreInternal))
+            : 0;
 
         if (montant == null || montant <= 0) {
             return new TransferRiskAssessmentDTO(
@@ -575,7 +596,9 @@ public class TransactionServiceImpl implements TransactionService {
                 0,
                 0,
                 newBeneficiary,
-                beneficiaryScore
+                beneficiaryScore,
+                unusualHour,
+                unusualHourScore
             );
         }
 
@@ -592,7 +615,7 @@ public class TransactionServiceImpl implements TransactionService {
         int dailyAmountScore = (int) Math.round(dailyAmountRatio * dailyAmountWeight * 100.0);
         int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
 
-        int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore;
+        int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore + unusualHourScore;
         if (score > 100) {
             score = 100;
         }
@@ -619,8 +642,31 @@ public class TransactionServiceImpl implements TransactionService {
             dailyAmountScore,
             dailyCountScore,
             newBeneficiary,
-            beneficiaryScore
+            beneficiaryScore,
+            unusualHour,
+            unusualHourScore
         );
+    }
+
+    private boolean isUnusualHour(LocalTime time) {
+        int start = unusualHourStart == null ? 22 : unusualHourStart;
+        int end = unusualHourEnd == null ? 6 : unusualHourEnd;
+
+        if (start < 0 || start > 23 || end < 0 || end > 23) {
+            start = 22;
+            end = 6;
+        }
+
+        int hour = time.getHour();
+        if (start == end) {
+            return true;
+        }
+
+        if (start < end) {
+            return hour >= start && hour <= end;
+        }
+
+        return hour >= start || hour <= end;
     }
 
     private boolean isNewBeneficiary(Long clientId, Long beneficiaireId) {
