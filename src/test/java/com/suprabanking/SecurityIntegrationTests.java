@@ -652,6 +652,97 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void riskPreviewShouldExposeMultiBeneficiaryVelocitySignal() throws Exception {
+        String token = registerAndGetToken("clientRiskVelocityA", "clientRiskVelocityA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskVelocityA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-VELOCITY-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Beneficiaire b1 = new Beneficiaire();
+        b1.setNom("Benef 1");
+        b1.setIban("FR7630001007941234567890201");
+        b1.setBanque("Banque Test");
+        b1.setEmail("b1@test.local");
+        b1.setClient(user.getClient());
+        b1.setCreatedAt(LocalDateTime.now().minusDays(2));
+        b1 = beneficiaireRepository.save(b1);
+
+        Beneficiaire b2 = new Beneficiaire();
+        b2.setNom("Benef 2");
+        b2.setIban("FR7630001007941234567890202");
+        b2.setBanque("Banque Test");
+        b2.setEmail("b2@test.local");
+        b2.setClient(user.getClient());
+        b2.setCreatedAt(LocalDateTime.now().minusDays(2));
+        b2 = beneficiaireRepository.save(b2);
+
+        Beneficiaire b3 = new Beneficiaire();
+        b3.setNom("Benef 3");
+        b3.setIban("FR7630001007941234567890203");
+        b3.setBanque("Banque Test");
+        b3.setEmail("b3@test.local");
+        b3.setClient(user.getClient());
+        b3.setCreatedAt(LocalDateTime.now().minusDays(2));
+        b3 = beneficiaireRepository.save(b3);
+
+        Beneficiaire b4 = new Beneficiaire();
+        b4.setNom("Benef 4");
+        b4.setIban("FR7630001007941234567890204");
+        b4.setBanque("Banque Test");
+        b4.setEmail("b4@test.local");
+        b4.setClient(user.getClient());
+        b4.setCreatedAt(LocalDateTime.now().minusDays(2));
+        b4 = beneficiaireRepository.save(b4);
+
+        Transaction tx1 = new Transaction();
+        tx1.setType("virement_externe");
+        tx1.setMontant(200.0);
+        tx1.setDateTransaction(LocalDateTime.now().minusMinutes(30));
+        tx1.setDescription("Velocity 1");
+        tx1.setClient(user.getClient());
+        tx1.setCompte(source);
+        tx1.setBeneficiaireId(b1.getId());
+        transactionRepository.save(tx1);
+
+        Transaction tx2 = new Transaction();
+        tx2.setType("virement_externe");
+        tx2.setMontant(220.0);
+        tx2.setDateTransaction(LocalDateTime.now().minusMinutes(25));
+        tx2.setDescription("Velocity 2");
+        tx2.setClient(user.getClient());
+        tx2.setCompte(source);
+        tx2.setBeneficiaireId(b2.getId());
+        transactionRepository.save(tx2);
+
+        Transaction tx3 = new Transaction();
+        tx3.setType("virement_externe");
+        tx3.setMontant(240.0);
+        tx3.setDateTransaction(LocalDateTime.now().minusMinutes(20));
+        tx3.setDescription("Velocity 3");
+        tx3.setClient(user.getClient());
+        tx3.setCompte(source);
+        tx3.setBeneficiaireId(b3.getId());
+        transactionRepository.save(tx3);
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "300")
+                .queryParam("type", "EXTERNE")
+                .queryParam("beneficiaireId", b4.getId().toString())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.multiBeneficiaryVelocity").value(true))
+            .andExpect(jsonPath("$.multiBeneficiaryVelocityScore").value(12))
+            .andExpect(jsonPath("$.distinctBeneficiariesWindow").value(4))
+            .andExpect(jsonPath("$.externalTransfersWindow").value(4));
+        }
+
+        @Test
         void riskPreviewShouldAdaptThresholdToClientRiskProfile() throws Exception {
         String token = registerAndGetToken("clientRiskProfileA", "clientRiskProfileA@test.local", "Secret123!");
         User user = userRepository.findByUsername("clientRiskProfileA").orElseThrow();

@@ -108,6 +108,18 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.risk-unusual-hour-score-internal:5}")
     private Integer unusualHourScoreInternal;
 
+    @Value("${app.transfers.risk-multi-beneficiary-window-minutes:60}")
+    private Integer multiBeneficiaryWindowMinutes;
+
+    @Value("${app.transfers.risk-multi-beneficiary-distinct-threshold:3}")
+    private Integer multiBeneficiaryDistinctThreshold;
+
+    @Value("${app.transfers.risk-multi-beneficiary-transfer-count-threshold:4}")
+    private Integer multiBeneficiaryTransferCountThreshold;
+
+    @Value("${app.transfers.risk-multi-beneficiary-score-external:12}")
+    private Integer multiBeneficiaryScoreExternal;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -306,6 +318,7 @@ public class TransactionServiceImpl implements TransactionService {
         debit.setDescription(descriptionBase + " - bénéficiaire " + beneficiaire.getNom() + " (" + destination + ")");
         debit.setClient(compteSource.getClient());
         debit.setCompte(compteSource);
+        debit.setBeneficiaireId(beneficiaire.getId());
 
         transactionRepository.save(debit);
 
@@ -468,6 +481,10 @@ public class TransactionServiceImpl implements TransactionService {
             riskDetails.put("newBeneficiaryScore", risk.getNewBeneficiaryScore());
             riskDetails.put("unusualHour", risk.getUnusualHour());
             riskDetails.put("unusualHourScore", risk.getUnusualHourScore());
+            riskDetails.put("multiBeneficiaryVelocity", risk.getMultiBeneficiaryVelocity());
+            riskDetails.put("multiBeneficiaryVelocityScore", risk.getMultiBeneficiaryVelocityScore());
+            riskDetails.put("distinctBeneficiariesWindow", risk.getDistinctBeneficiariesWindow());
+            riskDetails.put("externalTransfersWindow", risk.getExternalTransfersWindow());
             audit.setRiskDetails(riskDetails);
         }
         
@@ -580,6 +597,45 @@ public class TransactionServiceImpl implements TransactionService {
                 : (unusualHourScoreInternal == null ? 5 : unusualHourScoreInternal))
             : 0;
 
+        int distinctBeneficiariesWindow = 0;
+        int externalTransfersWindow = 0;
+        boolean multiBeneficiaryVelocity = false;
+        int multiBeneficiaryVelocityScore = 0;
+
+        if (isExternal) {
+            int windowMinutes = multiBeneficiaryWindowMinutes == null || multiBeneficiaryWindowMinutes <= 0
+                ? 60
+                : multiBeneficiaryWindowMinutes;
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime start = now.minusMinutes(windowMinutes);
+
+            long distinctBeneficiaries = transactionRepository
+                .countDistinctExternalBeneficiariesInWindow(clientId, start, now);
+            long externalTransfers = transactionRepository
+                .countExternalTransfersInWindow(clientId, start, now);
+
+            boolean hasCurrentBeneficiaryInWindow = false;
+            if (beneficiaireId != null) {
+            Long beneficiaryTransferCount = transactionRepository
+                .countExternalTransfersToBeneficiaryInWindow(clientId, beneficiaireId, start, now);
+            hasCurrentBeneficiaryInWindow = beneficiaryTransferCount != null && beneficiaryTransferCount > 0;
+            }
+
+            long projectedDistinct = distinctBeneficiaries + ((beneficiaireId != null && !hasCurrentBeneficiaryInWindow) ? 1 : 0);
+            long projectedTransfers = externalTransfers + 1;
+
+            int distinctThreshold = multiBeneficiaryDistinctThreshold == null ? 3 : multiBeneficiaryDistinctThreshold;
+            int transferThreshold = multiBeneficiaryTransferCountThreshold == null ? 4 : multiBeneficiaryTransferCountThreshold;
+
+            multiBeneficiaryVelocity = projectedDistinct >= distinctThreshold && projectedTransfers >= transferThreshold;
+            multiBeneficiaryVelocityScore = multiBeneficiaryVelocity
+                ? (multiBeneficiaryScoreExternal == null ? 12 : multiBeneficiaryScoreExternal)
+                : 0;
+
+            distinctBeneficiariesWindow = (int) projectedDistinct;
+            externalTransfersWindow = (int) projectedTransfers;
+        }
+
         if (montant == null || montant <= 0) {
             return new TransferRiskAssessmentDTO(
                 0,
@@ -598,7 +654,11 @@ public class TransactionServiceImpl implements TransactionService {
                 newBeneficiary,
                 beneficiaryScore,
                 unusualHour,
-                unusualHourScore
+                unusualHourScore,
+                multiBeneficiaryVelocity,
+                multiBeneficiaryVelocityScore,
+                distinctBeneficiariesWindow,
+                externalTransfersWindow
             );
         }
 
@@ -615,7 +675,8 @@ public class TransactionServiceImpl implements TransactionService {
         int dailyAmountScore = (int) Math.round(dailyAmountRatio * dailyAmountWeight * 100.0);
         int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
 
-        int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore + unusualHourScore;
+        int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore + unusualHourScore
+            + multiBeneficiaryVelocityScore;
         if (score > 100) {
             score = 100;
         }
@@ -644,7 +705,11 @@ public class TransactionServiceImpl implements TransactionService {
             newBeneficiary,
             beneficiaryScore,
             unusualHour,
-            unusualHourScore
+            unusualHourScore,
+            multiBeneficiaryVelocity,
+            multiBeneficiaryVelocityScore,
+            distinctBeneficiariesWindow,
+            externalTransfersWindow
         );
     }
 

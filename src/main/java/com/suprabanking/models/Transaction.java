@@ -29,6 +29,9 @@ public class Transaction implements Serializable {
     @Column(name = "description")
     private String description;
 
+    @Column(name = "beneficiaire_id")
+    private Long beneficiaireId;
+
     @ManyToOne
     @JoinColumn(name = "client_id")
     private Client client;

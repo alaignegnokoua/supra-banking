@@ -85,4 +85,49 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                                     )
                         """)
                 LocalDateTime findLastOutgoingTransferAt(@Param("clientId") Long clientId);
+
+                @Query("""
+                        select count(distinct t.beneficiaireId)
+                        from Transaction t
+                        where t.client.id = :clientId
+                            and t.dateTransaction >= :start
+                            and t.dateTransaction <= :end
+                            and lower(t.type) = 'virement_externe'
+                            and t.beneficiaireId is not null
+                        """)
+                Long countDistinctExternalBeneficiariesInWindow(
+                        @Param("clientId") Long clientId,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                        select count(t)
+                        from Transaction t
+                        where t.client.id = :clientId
+                            and t.dateTransaction >= :start
+                            and t.dateTransaction <= :end
+                            and lower(t.type) = 'virement_externe'
+                        """)
+                Long countExternalTransfersInWindow(
+                        @Param("clientId") Long clientId,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                        select count(t)
+                        from Transaction t
+                        where t.client.id = :clientId
+                            and t.beneficiaireId = :beneficiaireId
+                            and t.dateTransaction >= :start
+                            and t.dateTransaction <= :end
+                            and lower(t.type) = 'virement_externe'
+                        """)
+                Long countExternalTransfersToBeneficiaryInWindow(
+                        @Param("clientId") Long clientId,
+                        @Param("beneficiaireId") Long beneficiaireId,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end
+                );
 }

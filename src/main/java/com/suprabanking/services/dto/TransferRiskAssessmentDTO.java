@@ -30,4 +30,8 @@ public class TransferRiskAssessmentDTO implements Serializable {
     private Integer newBeneficiaryScore;
     private Boolean unusualHour;
     private Integer unusualHourScore;
+    private Boolean multiBeneficiaryVelocity;
+    private Integer multiBeneficiaryVelocityScore;
+    private Integer distinctBeneficiariesWindow;
+    private Integer externalTransfersWindow;
 }
