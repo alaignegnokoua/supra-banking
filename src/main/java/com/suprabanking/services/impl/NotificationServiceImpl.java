@@ -6,6 +6,7 @@ import com.suprabanking.models.Notification;
 import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.NotificationRepository;
 import com.suprabanking.services.EmailNotificationService;
+import com.suprabanking.services.ExternalNotificationService;
 import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.dto.NotificationDTO;
 import com.suprabanking.web.errors.ResourceNotFoundException;
@@ -29,6 +30,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final ClientRepository clientRepository;
     private final EmailNotificationService emailNotificationService;
+    private final ExternalNotificationService externalNotificationService;
     private final CurrentUserService currentUserService;
 
     @Override
@@ -101,6 +103,14 @@ public class NotificationServiceImpl implements NotificationService {
 
         if (Boolean.TRUE.equals(client.getNotificationsEmailEnabled())) {
             emailNotificationService.sendNotificationEmail(client, contenu);
+        }
+
+        if (Boolean.TRUE.equals(client.getNotificationsSmsEnabled())) {
+            externalNotificationService.sendSmsNotification(client, contenu);
+        }
+
+        if (Boolean.TRUE.equals(client.getNotificationsTelegramEnabled())) {
+            externalNotificationService.sendTelegramNotification(client, contenu);
         }
     }
 

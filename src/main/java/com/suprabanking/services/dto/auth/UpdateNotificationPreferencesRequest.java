@@ -13,4 +13,7 @@ public class UpdateNotificationPreferencesRequest {
 
     private boolean notificationsInAppEnabled;
     private boolean notificationsEmailEnabled;
+    private boolean notificationsSmsEnabled;
+    private boolean notificationsTelegramEnabled;
+    private String telegramChatId;
 }

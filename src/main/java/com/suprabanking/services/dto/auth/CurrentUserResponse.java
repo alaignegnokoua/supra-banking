@@ -28,6 +28,9 @@ public class CurrentUserResponse {
     private String clientTelephone;
     private boolean notificationsInAppEnabled;
     private boolean notificationsEmailEnabled;
+    private boolean notificationsSmsEnabled;
+    private boolean notificationsTelegramEnabled;
+    private String telegramChatId;
     private String riskProfile;
     private boolean mfaEnabled;
 }

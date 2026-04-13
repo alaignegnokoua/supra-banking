@@ -63,6 +63,9 @@ public class AuthService {
         client.setMotDePasse(passwordEncoder.encode(request.getPassword()));
         client.setNotificationsInAppEnabled(true);
         client.setNotificationsEmailEnabled(false);
+        client.setNotificationsSmsEnabled(false);
+        client.setNotificationsTelegramEnabled(false);
+        client.setTelegramChatId(null);
         client.setRiskProfile("STANDARD");
         client = clientRepository.save(client);
 
@@ -133,6 +136,9 @@ public class AuthService {
             .clientTelephone(client != null ? client.getTelephone() : null)
             .notificationsInAppEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsInAppEnabled()))
             .notificationsEmailEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsEmailEnabled()))
+            .notificationsSmsEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsSmsEnabled()))
+            .notificationsTelegramEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsTelegramEnabled()))
+            .telegramChatId(client != null ? client.getTelegramChatId() : null)
             .riskProfile(client != null && client.getRiskProfile() != null ? client.getRiskProfile() : "STANDARD")
                 .mfaEnabled(Boolean.TRUE.equals(user.getMfaEnabled()))
                 .build();
@@ -205,6 +211,11 @@ public class AuthService {
 
         client.setNotificationsInAppEnabled(request.isNotificationsInAppEnabled());
         client.setNotificationsEmailEnabled(request.isNotificationsEmailEnabled());
+        client.setNotificationsSmsEnabled(request.isNotificationsSmsEnabled());
+        client.setNotificationsTelegramEnabled(request.isNotificationsTelegramEnabled());
+        client.setTelegramChatId(request.getTelegramChatId() == null || request.getTelegramChatId().isBlank()
+            ? null
+            : request.getTelegramChatId().trim());
         clientRepository.save(client);
 
         return getCurrentUser(username);

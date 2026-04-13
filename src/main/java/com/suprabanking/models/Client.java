@@ -47,6 +47,15 @@ public class Client implements Serializable {
     @Column(name = "notifications_email_enabled")
     private Boolean notificationsEmailEnabled;
 
+    @Column(name = "notifications_sms_enabled")
+    private Boolean notificationsSmsEnabled;
+
+    @Column(name = "notifications_telegram_enabled")
+    private Boolean notificationsTelegramEnabled;
+
+    @Column(name = "telegram_chat_id")
+    private String telegramChatId;
+
     @Column(name = "risk_profile")
     private String riskProfile;
 
