@@ -84,6 +84,12 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/api/audits/me/**").hasRole("CLIENT")
 
+                        .requestMatchers(HttpMethod.POST, "/api/rpa-tasks/me/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/rpa-tasks/me/**").authenticated()
+                        .requestMatchers(HttpMethod.PATCH, "/api/rpa-tasks/me/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/rpa-tasks/**").hasAnyRole("ADMIN", "AGENT")
+                        .requestMatchers(HttpMethod.POST, "/api/rpa-tasks/admin/**").hasAnyRole("ADMIN", "AGENT")
+
                         .requestMatchers(HttpMethod.GET, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT", "CLIENT")
                         .requestMatchers(HttpMethod.POST, "/api/transactions/me/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.POST, "/api/transactions/**").hasAnyRole("ADMIN", "AGENT")

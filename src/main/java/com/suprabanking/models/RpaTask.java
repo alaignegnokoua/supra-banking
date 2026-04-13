@@ -26,8 +26,29 @@ public class RpaTask implements Serializable {
     @Column(name = "date_execution")
     private LocalDateTime dateExecution;
 
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    @Column(name = "finished_at")
+    private LocalDateTime finishedAt;
+
     @Column(name = "type")
     private String type;
+
+    @Column(name = "payload", length = 2000)
+    private String payload;
+
+    @Column(name = "result_message", length = 1000)
+    private String resultMessage;
+
+    @Column(name = "last_error", length = 1000)
+    private String lastError;
+
+    @Column(name = "retry_count")
+    private Integer retryCount;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

@@ -9,4 +9,6 @@ public interface RpaTaskRepository extends JpaRepository<RpaTask, Long> {
     List<RpaTask> findByStatut(String statut);
     List<RpaTask> findByType(String type);
     List<RpaTask> findByUser_Id(Long userId);
+    List<RpaTask> findByUser_IdOrderByCreatedAtDesc(Long userId);
+    List<RpaTask> findByStatutOrderByCreatedAtAsc(String statut);
 }
