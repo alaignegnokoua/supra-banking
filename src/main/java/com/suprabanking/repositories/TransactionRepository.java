@@ -175,4 +175,53 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                     @Param("end") LocalDateTime end,
                     @Param("maxAmount") Double maxAmount
                 );
+
+                @Query("""
+                    select count(distinct t.client.id)
+                    from Transaction t
+                    where t.dateTransaction >= :start
+                      and t.dateTransaction <= :end
+                    """)
+                long countDistinctClientsByDateRange(
+                    @Param("start") LocalDateTime start,
+                    @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                    select count(t)
+                    from Transaction t
+                    where lower(t.type) = lower(:type)
+                      and t.dateTransaction >= :start
+                      and t.dateTransaction <= :end
+                    """)
+                long countByTypeAndDateRange(
+                    @Param("type") String type,
+                    @Param("start") LocalDateTime start,
+                    @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                    select coalesce(sum(t.montant), 0)
+                    from Transaction t
+                    where lower(t.type) = lower(:type)
+                      and t.dateTransaction >= :start
+                      and t.dateTransaction <= :end
+                    """)
+                Double sumTransactionsByTypeAndDateRange(
+                    @Param("type") String type,
+                    @Param("start") LocalDateTime start,
+                    @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                    select coalesce(sum(t.montant), 0)
+                    from Transaction t
+                    """)
+                Double sumAllTransactionAmounts();
+
+                @Query("""
+                    select coalesce(avg(t.montant), 0)
+                    from Transaction t
+                    """)
+                Double averageTransactionAmount();
 }
