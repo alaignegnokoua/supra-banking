@@ -1,5 +1,27 @@
 package com.suprabanking;
 
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.suprabanking.models.Beneficiaire;
@@ -11,28 +33,6 @@ import com.suprabanking.repositories.ClientRepository;
 import com.suprabanking.repositories.CompteRepository;
 import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.repositories.UserRepository;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-
-import java.time.LocalDateTime;
-
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -830,6 +830,51 @@ class SecurityIntegrationTests {
             .andExpect(jsonPath("$.repeatedSmallTransfers").value(true))
             .andExpect(jsonPath("$.repeatedSmallTransfersScore").value(0))
             .andExpect(jsonPath("$.smallTransfersWindowCount").value(4));
+        }
+
+        @Test
+        void riskPreviewShouldExposeRepeatedBeneficiaryTransfersSignal() throws Exception {
+        String token = registerAndGetToken("clientRiskBenefA", "clientRiskBenefA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskBenefA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-BENEF-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Beneficiaire beneficiary = new Beneficiaire();
+        beneficiary.setNom("Benef Repeat");
+        beneficiary.setIban("FR7630001007941234567890501");
+        beneficiary.setBanque("Banque Test");
+        beneficiary.setEmail("benef.repeat@test.local");
+        beneficiary.setClient(user.getClient());
+        beneficiary.setCreatedAt(LocalDateTime.now().minusDays(2));
+        beneficiary = beneficiaireRepository.save(beneficiary);
+
+        for (int i = 0; i < 3; i++) {
+            Transaction tx = new Transaction();
+            tx.setType("virement_externe");
+            tx.setMontant(150.0);
+            tx.setDateTransaction(LocalDateTime.now().minusMinutes(20 + i));
+            tx.setDescription("Repeat beneficiary transfer " + i);
+            tx.setClient(user.getClient());
+            tx.setCompte(source);
+            tx.setBeneficiaireId(beneficiary.getId());
+            transactionRepository.save(tx);
+        }
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "180")
+                .queryParam("type", "EXTERNE")
+                .queryParam("beneficiaireId", beneficiary.getId().toString())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.repeatedBeneficiaryTransfers").value(true))
+            .andExpect(jsonPath("$.repeatedBeneficiaryTransfersScore").value(0))
+            .andExpect(jsonPath("$.beneficiaryTransfersWindowCount").value(4));
         }
 
         @Test

@@ -40,4 +40,7 @@ public class TransferRiskAssessmentDTO implements Serializable {
     private Boolean repeatedSmallTransfers;
     private Integer repeatedSmallTransfersScore;
     private Integer smallTransfersWindowCount;
+    private Boolean repeatedBeneficiaryTransfers;
+    private Integer repeatedBeneficiaryTransfersScore;
+    private Integer beneficiaryTransfersWindowCount;
 }

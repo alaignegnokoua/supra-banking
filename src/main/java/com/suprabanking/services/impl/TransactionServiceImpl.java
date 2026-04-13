@@ -144,6 +144,15 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.risk-small-transfer-score-external:8}")
     private Integer smallTransferScoreExternal;
 
+    @Value("${app.transfers.risk-repeated-beneficiary-window-minutes:60}")
+    private Integer repeatedBeneficiaryWindowMinutes;
+
+    @Value("${app.transfers.risk-repeated-beneficiary-transfer-threshold:4}")
+    private Integer repeatedBeneficiaryTransferThreshold;
+
+    @Value("${app.transfers.risk-repeated-beneficiary-score-external:12}")
+    private Integer repeatedBeneficiaryScoreExternal;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -515,6 +524,9 @@ public class TransactionServiceImpl implements TransactionService {
             riskDetails.put("repeatedSmallTransfers", risk.getRepeatedSmallTransfers());
             riskDetails.put("repeatedSmallTransfersScore", risk.getRepeatedSmallTransfersScore());
             riskDetails.put("smallTransfersWindowCount", risk.getSmallTransfersWindowCount());
+            riskDetails.put("repeatedBeneficiaryTransfers", risk.getRepeatedBeneficiaryTransfers());
+            riskDetails.put("repeatedBeneficiaryTransfersScore", risk.getRepeatedBeneficiaryTransfersScore());
+            riskDetails.put("beneficiaryTransfersWindowCount", risk.getBeneficiaryTransfersWindowCount());
             audit.setRiskDetails(riskDetails);
         }
         
@@ -637,6 +649,9 @@ public class TransactionServiceImpl implements TransactionService {
         boolean repeatedSmallTransfers = false;
         int repeatedSmallTransfersScore = 0;
         int smallTransfersWindowCount = 0;
+        boolean repeatedBeneficiaryTransfers = false;
+        int repeatedBeneficiaryTransfersScore = 0;
+        int beneficiaryTransfersWindowCount = 0;
 
         if (isExternal) {
             int windowMinutes = multiBeneficiaryWindowMinutes == null || multiBeneficiaryWindowMinutes <= 0
@@ -707,6 +722,23 @@ public class TransactionServiceImpl implements TransactionService {
                         ? (smallTransferScoreExternal == null ? 8 : smallTransferScoreExternal)
                         : 0;
                     smallTransfersWindowCount = (int) projectedSmallTransfers;
+
+                        if (beneficiaireId != null) {
+                        int repeatedWindowMinutes = repeatedBeneficiaryWindowMinutes == null || repeatedBeneficiaryWindowMinutes <= 0
+                            ? 60
+                            : repeatedBeneficiaryWindowMinutes;
+                        LocalDateTime repeatedWindowStart = now.minusMinutes(repeatedWindowMinutes);
+                        long beneficiaryTransfers = transactionRepository.countExternalTransfersToBeneficiaryInWindow(
+                            clientId, beneficiaireId, repeatedWindowStart, now);
+
+                        long projectedBeneficiaryTransfers = beneficiaryTransfers + 1;
+                        int beneficiaryThreshold = repeatedBeneficiaryTransferThreshold == null ? 4 : repeatedBeneficiaryTransferThreshold;
+                        repeatedBeneficiaryTransfers = projectedBeneficiaryTransfers >= beneficiaryThreshold;
+                        repeatedBeneficiaryTransfersScore = repeatedBeneficiaryTransfers
+                            ? (repeatedBeneficiaryScoreExternal == null ? 12 : repeatedBeneficiaryScoreExternal)
+                            : 0;
+                        beneficiaryTransfersWindowCount = (int) projectedBeneficiaryTransfers;
+                        }
         }
 
         if (montant == null || montant <= 0) {
@@ -737,7 +769,10 @@ public class TransactionServiceImpl implements TransactionService {
                 historicalAverageAmount,
                 repeatedSmallTransfers,
                 repeatedSmallTransfersScore,
-                smallTransfersWindowCount
+                smallTransfersWindowCount,
+                repeatedBeneficiaryTransfers,
+                repeatedBeneficiaryTransfersScore,
+                beneficiaryTransfersWindowCount
             );
         }
 
@@ -755,7 +790,8 @@ public class TransactionServiceImpl implements TransactionService {
         int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
 
         int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore + unusualHourScore
-            + multiBeneficiaryVelocityScore + unusualAmountScore + repeatedSmallTransfersScore;
+            + multiBeneficiaryVelocityScore + unusualAmountScore + repeatedSmallTransfersScore
+            + repeatedBeneficiaryTransfersScore;
         if (score > 100) {
             score = 100;
         }
@@ -794,7 +830,10 @@ public class TransactionServiceImpl implements TransactionService {
             historicalAverageAmount,
             repeatedSmallTransfers,
             repeatedSmallTransfersScore,
-            smallTransfersWindowCount
+            smallTransfersWindowCount,
+            repeatedBeneficiaryTransfers,
+            repeatedBeneficiaryTransfersScore,
+            beneficiaryTransfersWindowCount
         );
     }
 
