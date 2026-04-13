@@ -5,12 +5,12 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
 import com.suprabanking.config.security.CurrentUserService;
 import com.suprabanking.models.Beneficiaire;
@@ -25,12 +25,12 @@ import com.suprabanking.repositories.OperationAuditRepository;
 import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.TransactionService;
+import com.suprabanking.services.dto.OperationAuditDTO;
 import com.suprabanking.services.dto.TransactionDTO;
 import com.suprabanking.services.dto.TransferLimitStatusDTO;
 import com.suprabanking.services.dto.TransferRiskAssessmentDTO;
 import com.suprabanking.services.dto.VirementExterneRequest;
 import com.suprabanking.services.dto.VirementInterneRequest;
-import com.suprabanking.services.dto.OperationAuditDTO;
 import com.suprabanking.services.mapper.TransactionMapper;
 import com.suprabanking.web.errors.ResourceNotFoundException;
 
@@ -131,6 +131,18 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Value("${app.transfers.risk-unusual-amount-score-external:10}")
     private Integer unusualAmountScoreExternal;
+
+    @Value("${app.transfers.risk-small-transfer-window-minutes:30}")
+    private Integer smallTransferWindowMinutes;
+
+    @Value("${app.transfers.risk-small-transfer-max-amount:200}")
+    private Double smallTransferMaxAmount;
+
+    @Value("${app.transfers.risk-small-transfer-repeat-threshold:4}")
+    private Integer smallTransferRepeatThreshold;
+
+    @Value("${app.transfers.risk-small-transfer-score-external:8}")
+    private Integer smallTransferScoreExternal;
 
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
@@ -500,6 +512,9 @@ public class TransactionServiceImpl implements TransactionService {
             riskDetails.put("unusualAmount", risk.getUnusualAmount());
             riskDetails.put("unusualAmountScore", risk.getUnusualAmountScore());
             riskDetails.put("historicalAverageAmount", risk.getHistoricalAverageAmount());
+            riskDetails.put("repeatedSmallTransfers", risk.getRepeatedSmallTransfers());
+            riskDetails.put("repeatedSmallTransfersScore", risk.getRepeatedSmallTransfersScore());
+            riskDetails.put("smallTransfersWindowCount", risk.getSmallTransfersWindowCount());
             audit.setRiskDetails(riskDetails);
         }
         
@@ -619,6 +634,9 @@ public class TransactionServiceImpl implements TransactionService {
         boolean unusualAmount = false;
         int unusualAmountScore = 0;
         double historicalAverageAmount = 0.0;
+        boolean repeatedSmallTransfers = false;
+        int repeatedSmallTransfersScore = 0;
+        int smallTransfersWindowCount = 0;
 
         if (isExternal) {
             int windowMinutes = multiBeneficiaryWindowMinutes == null || multiBeneficiaryWindowMinutes <= 0
@@ -671,6 +689,24 @@ public class TransactionServiceImpl implements TransactionService {
                 unusualAmountScore = unusualAmount
                     ? (unusualAmountScoreExternal == null ? 10 : unusualAmountScoreExternal)
                     : 0;
+
+                    int smallWindowMinutes = smallTransferWindowMinutes == null || smallTransferWindowMinutes <= 0
+                        ? 30
+                        : smallTransferWindowMinutes;
+                    double maxSmallAmount = smallTransferMaxAmount == null || smallTransferMaxAmount <= 0
+                        ? 200.0
+                        : smallTransferMaxAmount;
+                    LocalDateTime smallWindowStart = now.minusMinutes(smallWindowMinutes);
+                    long smallTransfers = transactionRepository
+                        .countSmallExternalTransfersInWindow(clientId, smallWindowStart, now, maxSmallAmount);
+
+                    long projectedSmallTransfers = smallTransfers + (montant <= maxSmallAmount ? 1 : 0);
+                    int repeatThreshold = smallTransferRepeatThreshold == null ? 4 : smallTransferRepeatThreshold;
+                    repeatedSmallTransfers = projectedSmallTransfers >= repeatThreshold;
+                    repeatedSmallTransfersScore = repeatedSmallTransfers
+                        ? (smallTransferScoreExternal == null ? 8 : smallTransferScoreExternal)
+                        : 0;
+                    smallTransfersWindowCount = (int) projectedSmallTransfers;
         }
 
         if (montant == null || montant <= 0) {
@@ -698,7 +734,10 @@ public class TransactionServiceImpl implements TransactionService {
                 externalTransfersWindow,
                 unusualAmount,
                 unusualAmountScore,
-                historicalAverageAmount
+                historicalAverageAmount,
+                repeatedSmallTransfers,
+                repeatedSmallTransfersScore,
+                smallTransfersWindowCount
             );
         }
 
@@ -716,7 +755,7 @@ public class TransactionServiceImpl implements TransactionService {
         int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
 
         int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore + unusualHourScore
-            + multiBeneficiaryVelocityScore + unusualAmountScore;
+            + multiBeneficiaryVelocityScore + unusualAmountScore + repeatedSmallTransfersScore;
         if (score > 100) {
             score = 100;
         }
@@ -752,7 +791,10 @@ public class TransactionServiceImpl implements TransactionService {
             externalTransfersWindow,
             unusualAmount,
             unusualAmountScore,
-            historicalAverageAmount
+            historicalAverageAmount,
+            repeatedSmallTransfers,
+            repeatedSmallTransfersScore,
+            smallTransfersWindowCount
         );
     }
 

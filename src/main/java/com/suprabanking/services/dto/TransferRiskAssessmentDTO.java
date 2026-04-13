@@ -37,4 +37,7 @@ public class TransferRiskAssessmentDTO implements Serializable {
     private Boolean unusualAmount;
     private Integer unusualAmountScore;
     private Double historicalAverageAmount;
+    private Boolean repeatedSmallTransfers;
+    private Integer repeatedSmallTransfersScore;
+    private Integer smallTransfersWindowCount;
 }

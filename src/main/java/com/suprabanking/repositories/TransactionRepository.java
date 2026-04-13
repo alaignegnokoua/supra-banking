@@ -1,16 +1,17 @@
 package com.suprabanking.repositories;
 
-import com.suprabanking.models.Transaction;
-import com.suprabanking.models.Compte;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import com.suprabanking.models.Compte;
+import com.suprabanking.models.Transaction;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findByCompte(Compte compte);
@@ -157,5 +158,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                     @Param("clientId") Long clientId,
                     @Param("start") LocalDateTime start,
                     @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                    select count(t)
+                    from Transaction t
+                    where t.client.id = :clientId
+                      and t.dateTransaction >= :start
+                      and t.dateTransaction <= :end
+                      and lower(t.type) = 'virement_externe'
+                      and t.montant <= :maxAmount
+                    """)
+                Long countSmallExternalTransfersInWindow(
+                    @Param("clientId") Long clientId,
+                    @Param("start") LocalDateTime start,
+                    @Param("end") LocalDateTime end,
+                    @Param("maxAmount") Double maxAmount
                 );
 }

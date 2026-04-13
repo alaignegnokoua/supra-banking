@@ -788,6 +788,51 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void riskPreviewShouldExposeRepeatedSmallTransfersSignal() throws Exception {
+        String token = registerAndGetToken("clientRiskSmallA", "clientRiskSmallA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskSmallA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-SMALL-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Beneficiaire beneficiary = new Beneficiaire();
+        beneficiary.setNom("Benef Small");
+        beneficiary.setIban("FR7630001007941234567890401");
+        beneficiary.setBanque("Banque Test");
+        beneficiary.setEmail("benef.small@test.local");
+        beneficiary.setClient(user.getClient());
+        beneficiary.setCreatedAt(LocalDateTime.now().minusDays(2));
+        beneficiary = beneficiaireRepository.save(beneficiary);
+
+        for (int i = 0; i < 3; i++) {
+            Transaction tx = new Transaction();
+            tx.setType("virement_externe");
+            tx.setMontant(120.0);
+            tx.setDateTransaction(LocalDateTime.now().minusMinutes(10 + i));
+            tx.setDescription("Small transfer " + i);
+            tx.setClient(user.getClient());
+            tx.setCompte(source);
+            tx.setBeneficiaireId(beneficiary.getId());
+            transactionRepository.save(tx);
+        }
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "100")
+                .queryParam("type", "EXTERNE")
+                .queryParam("beneficiaireId", beneficiary.getId().toString())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.repeatedSmallTransfers").value(true))
+            .andExpect(jsonPath("$.repeatedSmallTransfersScore").value(0))
+            .andExpect(jsonPath("$.smallTransfersWindowCount").value(4));
+        }
+
+        @Test
         void riskPreviewShouldAdaptThresholdToClientRiskProfile() throws Exception {
         String token = registerAndGetToken("clientRiskProfileA", "clientRiskProfileA@test.local", "Secret123!");
         User user = userRepository.findByUsername("clientRiskProfileA").orElseThrow();
