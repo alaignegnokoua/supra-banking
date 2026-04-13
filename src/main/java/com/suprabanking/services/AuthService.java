@@ -12,6 +12,7 @@ import com.suprabanking.services.dto.auth.ChangePasswordRequest;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
+import com.suprabanking.services.dto.auth.UpdateMfaSettingsRequest;
 import com.suprabanking.services.dto.auth.UpdateNotificationPreferencesRequest;
 import com.suprabanking.services.dto.auth.UpdateProfileRequest;
 import com.suprabanking.web.errors.ResourceNotFoundException;
@@ -23,10 +24,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final EmailNotificationService emailNotificationService;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -67,6 +71,7 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setMotDePasse(passwordEncoder.encode(request.getPassword()));
         user.setEnabled(true);
+        user.setMfaEnabled(false);
         user.setRoles(Set.of(clientRole));
         user.setClient(client);
 
@@ -85,6 +90,26 @@ public class AuthService {
 
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        if (Boolean.TRUE.equals(user.getMfaEnabled())) {
+            String providedCode = request.getMfaCode() == null ? "" : request.getMfaCode().trim();
+            if (providedCode.isEmpty()) {
+                issueAndSendMfaCode(user);
+                return AuthResponse.builder()
+                        .username(user.getUsername())
+                        .mfaRequired(true)
+                        .mfaMessage("Un code MFA a été envoyé à votre email")
+                        .build();
+            }
+
+            if (!isMfaCodeValid(user, providedCode)) {
+                throw new BadCredentialsException("Code MFA invalide ou expiré");
+            }
+
+            user.setMfaCode(null);
+            user.setMfaCodeExpiresAt(null);
+            userRepository.save(user);
+        }
 
         return buildAuthResponse(user);
     }
@@ -109,6 +134,7 @@ public class AuthService {
             .notificationsInAppEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsInAppEnabled()))
             .notificationsEmailEnabled(client != null && Boolean.TRUE.equals(client.getNotificationsEmailEnabled()))
             .riskProfile(client != null && client.getRiskProfile() != null ? client.getRiskProfile() : "STANDARD")
+                .mfaEnabled(Boolean.TRUE.equals(user.getMfaEnabled()))
                 .build();
     }
 
@@ -184,6 +210,20 @@ public class AuthService {
         return getCurrentUser(username);
     }
 
+    public CurrentUserResponse updateCurrentUserMfaSettings(String username, UpdateMfaSettingsRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        user.setMfaEnabled(request.isMfaEnabled());
+        if (!request.isMfaEnabled()) {
+            user.setMfaCode(null);
+            user.setMfaCodeExpiresAt(null);
+        }
+
+        userRepository.save(user);
+        return getCurrentUser(username);
+    }
+
     private AuthResponse buildAuthResponse(User user) {
         List<String> roleNames = user.getRoles().stream()
                 .map(Role::getNom)
@@ -207,6 +247,33 @@ public class AuthService {
                 .expiresIn(jwtService.getExpirationMs())
                 .username(user.getUsername())
                 .roles(roleNames)
+                .mfaRequired(false)
                 .build();
+    }
+
+    private void issueAndSendMfaCode(User user) {
+        String code = String.valueOf(ThreadLocalRandom.current().nextInt(100000, 1000000));
+        user.setMfaCode(code);
+        user.setMfaCodeExpiresAt(LocalDateTime.now().plusMinutes(5));
+        userRepository.save(user);
+
+        if (user.getClient() != null) {
+            emailNotificationService.sendNotificationEmail(
+                    user.getClient(),
+                    "Votre code MFA est " + code + " (valable 5 minutes)."
+            );
+        }
+    }
+
+    private boolean isMfaCodeValid(User user, String providedCode) {
+        if (user.getMfaCode() == null || user.getMfaCodeExpiresAt() == null) {
+            return false;
+        }
+
+        if (user.getMfaCodeExpiresAt().isBefore(LocalDateTime.now())) {
+            return false;
+        }
+
+        return user.getMfaCode().equals(providedCode);
     }
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.Set;
 
 @Entity
@@ -29,6 +30,15 @@ public class User implements Serializable {
 
     @Column(name = "enabled")
     private boolean enabled = true;
+
+    @Column(name = "mfa_enabled")
+    private Boolean mfaEnabled = false;
+
+    @Column(name = "mfa_code")
+    private String mfaCode;
+
+    @Column(name = "mfa_code_expires_at")
+    private LocalDateTime mfaCodeExpiresAt;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

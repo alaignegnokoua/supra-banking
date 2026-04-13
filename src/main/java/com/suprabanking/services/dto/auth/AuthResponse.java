@@ -20,4 +20,6 @@ public class AuthResponse {
     private Long expiresIn;
     private String username;
     private List<String> roles;
+    private boolean mfaRequired;
+    private String mfaMessage;
 }

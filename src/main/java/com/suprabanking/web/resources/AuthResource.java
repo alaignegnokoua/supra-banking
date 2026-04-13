@@ -6,6 +6,7 @@ import com.suprabanking.services.dto.auth.ChangePasswordRequest;
 import com.suprabanking.services.dto.auth.CurrentUserResponse;
 import com.suprabanking.services.dto.auth.LoginRequest;
 import com.suprabanking.services.dto.auth.RegisterRequest;
+import com.suprabanking.services.dto.auth.UpdateMfaSettingsRequest;
 import com.suprabanking.services.dto.auth.UpdateNotificationPreferencesRequest;
 import com.suprabanking.services.dto.auth.UpdateProfileRequest;
 import jakarta.validation.Valid;
@@ -66,5 +67,11 @@ public class AuthResource {
         return ResponseEntity.ok(
                 authService.updateCurrentUserNotificationPreferences(principal.getName(), request)
         );
+    }
+
+    @PutMapping("/me/mfa")
+    public ResponseEntity<CurrentUserResponse> updateMfa(Principal principal,
+                                                          @RequestBody UpdateMfaSettingsRequest request) {
+        return ResponseEntity.ok(authService.updateCurrentUserMfaSettings(principal.getName(), request));
     }
 }

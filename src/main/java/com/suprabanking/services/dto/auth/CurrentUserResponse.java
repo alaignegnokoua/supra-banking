@@ -29,4 +29,5 @@ public class CurrentUserResponse {
     private boolean notificationsInAppEnabled;
     private boolean notificationsEmailEnabled;
     private String riskProfile;
+    private boolean mfaEnabled;
 }
