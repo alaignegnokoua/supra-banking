@@ -743,6 +743,51 @@ class SecurityIntegrationTests {
         }
 
         @Test
+        void riskPreviewShouldExposeUnusualAmountSignal() throws Exception {
+        String token = registerAndGetToken("clientRiskAmountA", "clientRiskAmountA@test.local", "Secret123!");
+        User user = userRepository.findByUsername("clientRiskAmountA").orElseThrow();
+
+        Compte source = new Compte();
+        source.setNumeroCompte("RISK-AMOUNT-SRC-1");
+        source.setType("courant");
+        source.setSolde(100000.0);
+        source.setDateCreation(LocalDateTime.now());
+        source.setClient(user.getClient());
+        source = compteRepository.save(source);
+
+        Beneficiaire beneficiary = new Beneficiaire();
+        beneficiary.setNom("Benef Amount");
+        beneficiary.setIban("FR7630001007941234567890301");
+        beneficiary.setBanque("Banque Test");
+        beneficiary.setEmail("benef.amount@test.local");
+        beneficiary.setClient(user.getClient());
+        beneficiary.setCreatedAt(LocalDateTime.now().minusDays(2));
+        beneficiary = beneficiaireRepository.save(beneficiary);
+
+        for (int i = 0; i < 5; i++) {
+            Transaction tx = new Transaction();
+            tx.setType("virement_externe");
+            tx.setMontant(100.0);
+            tx.setDateTransaction(LocalDateTime.now().minusDays(1).minusMinutes(i));
+            tx.setDescription("Amount history " + i);
+            tx.setClient(user.getClient());
+            tx.setCompte(source);
+            tx.setBeneficiaireId(beneficiary.getId());
+            transactionRepository.save(tx);
+        }
+
+        mockMvc.perform(get("/api/transactions/me/risk-preview")
+                .queryParam("montant", "400")
+                .queryParam("type", "EXTERNE")
+                .queryParam("beneficiaireId", beneficiary.getId().toString())
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unusualAmount").value(true))
+            .andExpect(jsonPath("$.unusualAmountScore").value(0))
+            .andExpect(jsonPath("$.historicalAverageAmount").value(100.0));
+        }
+
+        @Test
         void riskPreviewShouldAdaptThresholdToClientRiskProfile() throws Exception {
         String token = registerAndGetToken("clientRiskProfileA", "clientRiskProfileA@test.local", "Secret123!");
         User user = userRepository.findByUsername("clientRiskProfileA").orElseThrow();

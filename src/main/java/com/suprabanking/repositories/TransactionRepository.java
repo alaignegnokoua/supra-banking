@@ -130,4 +130,32 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                         @Param("start") LocalDateTime start,
                         @Param("end") LocalDateTime end
                 );
+
+                @Query("""
+                    select coalesce(avg(t.montant), 0)
+                    from Transaction t
+                    where t.client.id = :clientId
+                      and t.dateTransaction >= :start
+                      and t.dateTransaction <= :end
+                      and lower(t.type) = 'virement_externe'
+                    """)
+                Double averageExternalTransferAmountInWindow(
+                    @Param("clientId") Long clientId,
+                    @Param("start") LocalDateTime start,
+                    @Param("end") LocalDateTime end
+                );
+
+                @Query("""
+                    select count(t)
+                    from Transaction t
+                    where t.client.id = :clientId
+                      and t.dateTransaction >= :start
+                      and t.dateTransaction <= :end
+                      and lower(t.type) = 'virement_externe'
+                    """)
+                Long countExternalTransfersForAmountHistory(
+                    @Param("clientId") Long clientId,
+                    @Param("start") LocalDateTime start,
+                    @Param("end") LocalDateTime end
+                );
 }

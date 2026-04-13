@@ -120,6 +120,18 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${app.transfers.risk-multi-beneficiary-score-external:12}")
     private Integer multiBeneficiaryScoreExternal;
 
+    @Value("${app.transfers.risk-unusual-amount-history-days:30}")
+    private Integer unusualAmountHistoryDays;
+
+    @Value("${app.transfers.risk-unusual-amount-min-history-count:5}")
+    private Integer unusualAmountMinHistoryCount;
+
+    @Value("${app.transfers.risk-unusual-amount-multiplier:3.0}")
+    private Double unusualAmountMultiplier;
+
+    @Value("${app.transfers.risk-unusual-amount-score-external:10}")
+    private Integer unusualAmountScoreExternal;
+
     @Override
     public TransactionDTO saveTransaction(TransactionDTO dto) {
         log.debug("Request to save Transaction : {}", dto);
@@ -485,6 +497,9 @@ public class TransactionServiceImpl implements TransactionService {
             riskDetails.put("multiBeneficiaryVelocityScore", risk.getMultiBeneficiaryVelocityScore());
             riskDetails.put("distinctBeneficiariesWindow", risk.getDistinctBeneficiariesWindow());
             riskDetails.put("externalTransfersWindow", risk.getExternalTransfersWindow());
+            riskDetails.put("unusualAmount", risk.getUnusualAmount());
+            riskDetails.put("unusualAmountScore", risk.getUnusualAmountScore());
+            riskDetails.put("historicalAverageAmount", risk.getHistoricalAverageAmount());
             audit.setRiskDetails(riskDetails);
         }
         
@@ -601,6 +616,9 @@ public class TransactionServiceImpl implements TransactionService {
         int externalTransfersWindow = 0;
         boolean multiBeneficiaryVelocity = false;
         int multiBeneficiaryVelocityScore = 0;
+        boolean unusualAmount = false;
+        int unusualAmountScore = 0;
+        double historicalAverageAmount = 0.0;
 
         if (isExternal) {
             int windowMinutes = multiBeneficiaryWindowMinutes == null || multiBeneficiaryWindowMinutes <= 0
@@ -634,6 +652,25 @@ public class TransactionServiceImpl implements TransactionService {
 
             distinctBeneficiariesWindow = (int) projectedDistinct;
             externalTransfersWindow = (int) projectedTransfers;
+
+                int historyDays = unusualAmountHistoryDays == null || unusualAmountHistoryDays <= 0
+                    ? 30
+                    : unusualAmountHistoryDays;
+                LocalDateTime historyStart = now.minusDays(historyDays);
+                Long historyCount = transactionRepository.countExternalTransfersForAmountHistory(clientId, historyStart, now);
+                historicalAverageAmount = transactionRepository.averageExternalTransferAmountInWindow(clientId, historyStart, now);
+
+                int minHistoryCount = unusualAmountMinHistoryCount == null ? 5 : unusualAmountMinHistoryCount;
+                double multiplier = unusualAmountMultiplier == null || unusualAmountMultiplier <= 0 ? 3.0 : unusualAmountMultiplier;
+
+                unusualAmount = historyCount != null
+                    && historyCount >= minHistoryCount
+                    && historicalAverageAmount > 0
+                    && montant >= (historicalAverageAmount * multiplier);
+
+                unusualAmountScore = unusualAmount
+                    ? (unusualAmountScoreExternal == null ? 10 : unusualAmountScoreExternal)
+                    : 0;
         }
 
         if (montant == null || montant <= 0) {
@@ -658,7 +695,10 @@ public class TransactionServiceImpl implements TransactionService {
                 multiBeneficiaryVelocity,
                 multiBeneficiaryVelocityScore,
                 distinctBeneficiariesWindow,
-                externalTransfersWindow
+                externalTransfersWindow,
+                unusualAmount,
+                unusualAmountScore,
+                historicalAverageAmount
             );
         }
 
@@ -676,7 +716,7 @@ public class TransactionServiceImpl implements TransactionService {
         int dailyCountScore = (int) Math.round(dailyCountRatio * dailyCountWeight * 100.0);
 
         int score = amountScore + dailyAmountScore + dailyCountScore + beneficiaryScore + unusualHourScore
-            + multiBeneficiaryVelocityScore;
+            + multiBeneficiaryVelocityScore + unusualAmountScore;
         if (score > 100) {
             score = 100;
         }
@@ -709,7 +749,10 @@ public class TransactionServiceImpl implements TransactionService {
             multiBeneficiaryVelocity,
             multiBeneficiaryVelocityScore,
             distinctBeneficiariesWindow,
-            externalTransfersWindow
+            externalTransfersWindow,
+            unusualAmount,
+            unusualAmountScore,
+            historicalAverageAmount
         );
     }
 
