@@ -13,6 +13,7 @@ import java.util.List;
 public interface OperationAuditRepository extends JpaRepository<OperationAudit, Long> {
 	List<OperationAudit> findByClientIdOrderByCreatedAtDesc(Long clientId);
 	Page<OperationAudit> findByClientIdOrderByCreatedAtDesc(Long clientId, Pageable pageable);
+	List<OperationAudit> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime startDate, LocalDateTime endDate);
 
 	@Query("""
 		select count(a)

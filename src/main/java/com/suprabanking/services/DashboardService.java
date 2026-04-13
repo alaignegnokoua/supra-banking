@@ -1,6 +1,7 @@
 package com.suprabanking.services;
 
 import com.suprabanking.services.dto.DashboardStatisticsDTO;
+import com.suprabanking.services.dto.MonthlyReportDTO;
 
 public interface DashboardService {
 
@@ -25,4 +26,10 @@ public interface DashboardService {
     long getTotalBeneficiaries();
 
     long getActiveBeneficiaries();
+
+    MonthlyReportDTO getMonthlyReport(int year, int month);
+
+    String exportMonthlyTransactionsCsv(int year, int month);
+
+    String exportMonthlyAuditsCsv(int year, int month);
 }

@@ -224,4 +224,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                     from Transaction t
                     """)
                 Double averageTransactionAmount();
+
+                List<Transaction> findByDateTransactionBetweenOrderByDateTransactionDesc(LocalDateTime start, LocalDateTime end);
 }
