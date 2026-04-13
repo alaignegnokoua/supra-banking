@@ -25,6 +25,7 @@ import com.suprabanking.repositories.OperationAuditRepository;
 import com.suprabanking.repositories.TransactionRepository;
 import com.suprabanking.services.NotificationService;
 import com.suprabanking.services.TransactionService;
+import com.suprabanking.services.BeneficiaryUsageHistoryService;
 import com.suprabanking.services.dto.OperationAuditDTO;
 import com.suprabanking.services.dto.TransactionDTO;
 import com.suprabanking.services.dto.TransferLimitStatusDTO;
@@ -48,6 +49,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final OperationAuditRepository operationAuditRepository;
     private final ClientRepository clientRepository;
     private final NotificationService notificationService;
+    private final BeneficiaryUsageHistoryService usageHistoryService;
     private final TransactionMapper transactionMapper;
     private final CurrentUserService currentUserService;
 
@@ -354,6 +356,13 @@ public class TransactionServiceImpl implements TransactionService {
         debit.setBeneficiaireId(beneficiaire.getId());
 
         transactionRepository.save(debit);
+
+        // Record beneficiary usage
+        usageHistoryService.recordUsage(beneficiaire.getId(), debit.getId(), request.getMontant(), "VIREMENT_EXTERNE", "SUCCESS");
+
+        // Update last used timestamp
+        beneficiaire.setLastUsedAt(LocalDateTime.now());
+        beneficiaireRepository.save(beneficiaire);
 
         saveAudit("VIREMENT_EXTERNE", "SUCCES", "Virement externe effectué", clientId,
             request.getCompteSourceId(), null, request.getBeneficiaireId(), request.getMontant());

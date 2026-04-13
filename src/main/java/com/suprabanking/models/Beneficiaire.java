@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -36,10 +37,19 @@ public class Beneficiaire implements Serializable {
     @Column(name = "email")
     private String email;
 
+    @Column(name = "status", nullable = false)
+    private String status = "ACTIVE"; // ACTIVE, PENDING_VERIFICATION, BLOCKED
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "last_used_at")
+    private LocalDateTime lastUsedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
+
+    @OneToMany(mappedBy = "beneficiaire", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<BeneficiaryUsageHistory> usageHistory;
 }

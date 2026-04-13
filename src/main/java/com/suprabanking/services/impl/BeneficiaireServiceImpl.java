@@ -4,6 +4,7 @@ import com.suprabanking.config.security.CurrentUserService;
 import com.suprabanking.models.Beneficiaire;
 import com.suprabanking.models.Client;
 import com.suprabanking.repositories.BeneficiaireRepository;
+import com.suprabanking.repositories.BeneficiaryUsageHistoryRepository;
 import com.suprabanking.services.BeneficiaireService;
 import com.suprabanking.services.dto.BeneficiaireDTO;
 import com.suprabanking.web.errors.ResourceNotFoundException;
@@ -21,6 +22,7 @@ import java.util.Optional;
 public class BeneficiaireServiceImpl implements BeneficiaireService {
 
     private final BeneficiaireRepository beneficiaireRepository;
+    private final BeneficiaryUsageHistoryRepository usageHistoryRepository;
     private final CurrentUserService currentUserService;
 
     @Override
@@ -112,16 +114,25 @@ public class BeneficiaireServiceImpl implements BeneficiaireService {
         entity.setRib(dto.getRib() != null ? dto.getRib().replaceAll("\\s+", "") : null);
         entity.setBanque(dto.getBanque() != null ? dto.getBanque().trim() : null);
         entity.setEmail(dto.getEmail() != null ? dto.getEmail().trim() : null);
+        
+        // Only update status if provided in DTO
+        if (dto.getStatus() != null) {
+            entity.setStatus(dto.getStatus());
+        }
     }
 
     private BeneficiaireDTO toDto(Beneficiaire entity) {
-        return new BeneficiaireDTO(
-                entity.getId(),
-                entity.getNom(),
-                entity.getIban(),
-                entity.getRib(),
-                entity.getBanque(),
-                entity.getEmail()
-        );
+        return BeneficiaireDTO.builder()
+                .id(entity.getId())
+                .nom(entity.getNom())
+                .iban(entity.getIban())
+                .rib(entity.getRib())
+                .banque(entity.getBanque())
+                .email(entity.getEmail())
+                .createdAt(entity.getCreatedAt())
+                .lastUsedAt(entity.getLastUsedAt())
+                .status(entity.getStatus())
+                .successfulTransfersCount(usageHistoryRepository.countSuccessfulUsagesByBeneficiaire(entity.getId()))
+                .build();
     }
 }

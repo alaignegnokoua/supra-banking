@@ -1,14 +1,21 @@
 package com.suprabanking.web.resources;
 
 import com.suprabanking.services.BeneficiaireService;
+import com.suprabanking.services.BeneficiaryUsageHistoryService;
 import com.suprabanking.services.dto.BeneficiaireDTO;
+import com.suprabanking.services.dto.BeneficiaryUsageHistoryDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -18,6 +25,7 @@ import java.util.List;
 public class BeneficiaireResource {
 
     private final BeneficiaireService beneficiaireService;
+    private final BeneficiaryUsageHistoryService usageHistoryService;
 
     @PostMapping("/me")
     @ResponseStatus(HttpStatus.CREATED)
@@ -51,5 +59,44 @@ public class BeneficiaireResource {
     public void deleteMyBeneficiaire(@PathVariable Long id) {
         log.debug("REST request to delete my beneficiaire: {}", id);
         beneficiaireService.deleteMyBeneficiaire(id);
+    }
+
+    @GetMapping("/me/{id}/usage-history")
+    public Page<BeneficiaryUsageHistoryDTO> getMyBeneficiaryUsageHistory(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "usedAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") Sort.Direction direction
+    ) {
+        log.debug("REST request to get usage history for beneficiary: {}", id);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        return usageHistoryService.getMyBeneficiaryUsageHistory(id, pageable);
+    }
+
+    @GetMapping("/me/usage-history")
+    public Page<BeneficiaryUsageHistoryDTO> getMyBeneficiariesUsageHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "usedAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") Sort.Direction direction
+    ) {
+        log.debug("REST request to get all my beneficiaries usage history");
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        return usageHistoryService.getMyBeneficiaryUsageHistory(pageable);
+    }
+
+    @GetMapping("/me/usage-history/by-date")
+    public Page<BeneficiaryUsageHistoryDTO> getMyBeneficiariesUsageHistoryByDateRange(
+            @RequestParam LocalDateTime startDate,
+            @RequestParam LocalDateTime endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "usedAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") Sort.Direction direction
+    ) {
+        log.debug("REST request to get beneficiaries usage history by date range: {} to {}", startDate, endDate);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+        return usageHistoryService.getMyBeneficiaryUsageHistoryByDateRange(startDate, endDate, pageable);
     }
 }
