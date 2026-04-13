@@ -79,6 +79,34 @@ public class ClientServiceImpl implements ClientService {
     }
 
     @Override
+    public ClientDTO updateClientTransferLimits(Long id, Double maxSingleTransferAmount, Double maxDailyTransferTotal,
+                                                Integer maxDailyTransferCount, Integer minTransferIntervalSeconds) {
+        log.debug("Request to update Client transfer limits id={}", id);
+        Client entity = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id=" + id));
+
+        if (maxSingleTransferAmount != null && maxSingleTransferAmount <= 0) {
+            throw new IllegalArgumentException("Le plafond unitaire personnalisé doit être strictement positif");
+        }
+        if (maxDailyTransferTotal != null && maxDailyTransferTotal <= 0) {
+            throw new IllegalArgumentException("Le plafond journalier personnalisé doit être strictement positif");
+        }
+        if (maxDailyTransferCount != null && maxDailyTransferCount <= 0) {
+            throw new IllegalArgumentException("Le nombre maximal de virements doit être strictement positif");
+        }
+        if (minTransferIntervalSeconds != null && minTransferIntervalSeconds < 0) {
+            throw new IllegalArgumentException("Le délai minimal entre virements ne peut pas être négatif");
+        }
+
+        entity.setCustomMaxSingleTransferAmount(maxSingleTransferAmount);
+        entity.setCustomMaxDailyTransferTotal(maxDailyTransferTotal);
+        entity.setCustomMaxDailyTransferCount(maxDailyTransferCount);
+        entity.setCustomMinTransferIntervalSeconds(minTransferIntervalSeconds);
+
+        return clientMapper.toDto(clientRepository.save(entity));
+    }
+
+    @Override
     public Page<ClientDTO> findAllClients(Pageable pageable) {
         log.debug("Request to get all Clients");
         return clientRepository.findAll(pageable).map(clientMapper::toDto);

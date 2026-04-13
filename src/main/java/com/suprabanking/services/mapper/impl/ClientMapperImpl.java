@@ -43,5 +43,17 @@ public class ClientMapperImpl implements ClientMapper {
         if (dto.getRiskProfile() != null) {
             entity.setRiskProfile(dto.getRiskProfile());
         }
+        if (dto.getCustomMaxSingleTransferAmount() != null) {
+            entity.setCustomMaxSingleTransferAmount(dto.getCustomMaxSingleTransferAmount());
+        }
+        if (dto.getCustomMaxDailyTransferTotal() != null) {
+            entity.setCustomMaxDailyTransferTotal(dto.getCustomMaxDailyTransferTotal());
+        }
+        if (dto.getCustomMaxDailyTransferCount() != null) {
+            entity.setCustomMaxDailyTransferCount(dto.getCustomMaxDailyTransferCount());
+        }
+        if (dto.getCustomMinTransferIntervalSeconds() != null) {
+            entity.setCustomMinTransferIntervalSeconds(dto.getCustomMinTransferIntervalSeconds());
+        }
     }
 }

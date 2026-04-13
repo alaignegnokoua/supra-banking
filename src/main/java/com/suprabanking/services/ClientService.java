@@ -16,6 +16,9 @@ public interface ClientService {
 
     ClientDTO updateClientRiskProfile(Long id, String riskProfile);
 
+    ClientDTO updateClientTransferLimits(Long id, Double maxSingleTransferAmount, Double maxDailyTransferTotal,
+                                         Integer maxDailyTransferCount, Integer minTransferIntervalSeconds);
+
     Page<ClientDTO> findAllClients(Pageable pageable);
 
     Optional<ClientDTO> findOne(Long id);

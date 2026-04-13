@@ -34,4 +34,12 @@ public class ClientDTO implements Serializable {
     private String identifiant;
 
     private String riskProfile;
+
+    private Double customMaxSingleTransferAmount;
+
+    private Double customMaxDailyTransferTotal;
+
+    private Integer customMaxDailyTransferCount;
+
+    private Integer customMinTransferIntervalSeconds;
 }

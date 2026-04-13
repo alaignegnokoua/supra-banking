@@ -386,21 +386,29 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     public TransferLimitStatusDTO getMyTransferLimits() {
         Long clientId = currentUserService.requireCurrentClientId();
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client introuvable"));
+
+        Double effectiveMaxSingle = resolveMaxSingleTransferAmount(client);
+        Double effectiveMaxDailyTotal = resolveMaxDailyTransferTotal(client);
+        Integer effectiveMaxDailyCount = resolveMaxDailyTransferCount(client);
+        Integer effectiveMinInterval = resolveMinTransferIntervalSeconds(client);
+
         Double todayOutgoingTotal = getTodayOutgoingTotal(clientId);
         Long todayOutgoingCountLong = getTodayOutgoingCount(clientId);
         int todayOutgoingCount = todayOutgoingCountLong == null ? 0 : todayOutgoingCountLong.intValue();
-        int remainingCooldownSeconds = getRemainingCooldownSeconds(clientId);
+        int remainingCooldownSeconds = getRemainingCooldownSeconds(clientId, effectiveMinInterval);
 
-        double effectiveDailyMax = maxDailyTransferTotal == null ? 0.0 : maxDailyTransferTotal;
+        double effectiveDailyMax = effectiveMaxDailyTotal == null ? 0.0 : effectiveMaxDailyTotal;
         double remainingDailyAmount = Math.max(0.0, effectiveDailyMax - todayOutgoingTotal);
-        int effectiveDailyCountMax = maxDailyTransferCount == null ? 0 : maxDailyTransferCount;
+        int effectiveDailyCountMax = effectiveMaxDailyCount == null ? 0 : effectiveMaxDailyCount;
         int remainingDailyCount = Math.max(0, effectiveDailyCountMax - todayOutgoingCount);
 
         return new TransferLimitStatusDTO(
-                maxSingleTransferAmount,
-                maxDailyTransferTotal,
-            maxDailyTransferCount,
-                minTransferIntervalSeconds,
+                effectiveMaxSingle,
+                effectiveMaxDailyTotal,
+            effectiveMaxDailyCount,
+                effectiveMinInterval,
                 todayOutgoingTotal,
             remainingDailyAmount,
             todayOutgoingCount,
@@ -554,7 +562,15 @@ public class TransactionServiceImpl implements TransactionService {
             return;
         }
 
-        if (maxSingleTransferAmount != null && montant > maxSingleTransferAmount) {
+        Client client = clientRepository.findById(clientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Client introuvable"));
+
+        Double effectiveMaxSingle = resolveMaxSingleTransferAmount(client);
+        Double effectiveMaxDailyTotal = resolveMaxDailyTransferTotal(client);
+        Integer effectiveMaxDailyCount = resolveMaxDailyTransferCount(client);
+        Integer effectiveMinInterval = resolveMinTransferIntervalSeconds(client);
+
+        if (effectiveMaxSingle != null && montant > effectiveMaxSingle) {
             saveAudit(operationType, "ECHEC", "Plafond unitaire dépassé", clientId,
                     compteSourceId, compteDestinationId, beneficiaireId, montant);
             throw new IllegalArgumentException("Montant supérieur au plafond unitaire autorisé");
@@ -575,7 +591,7 @@ public class TransactionServiceImpl implements TransactionService {
         Double alreadyTransferred = getTodayOutgoingTotal(clientId);
         double totalAfterTransfer = (alreadyTransferred == null ? 0.0 : alreadyTransferred) + montant;
 
-        if (maxDailyTransferTotal != null && totalAfterTransfer > maxDailyTransferTotal) {
+        if (effectiveMaxDailyTotal != null && totalAfterTransfer > effectiveMaxDailyTotal) {
             saveAudit(operationType, "ECHEC", "Plafond journalier dépassé", clientId,
                     compteSourceId, compteDestinationId, beneficiaireId, montant);
             throw new IllegalArgumentException("Plafond journalier de virement dépassé");
@@ -584,13 +600,13 @@ public class TransactionServiceImpl implements TransactionService {
         Long todayTransferCount = getTodayOutgoingCount(clientId);
         long countAfterTransfer = (todayTransferCount == null ? 0L : todayTransferCount) + 1L;
 
-        if (maxDailyTransferCount != null && countAfterTransfer > maxDailyTransferCount) {
+        if (effectiveMaxDailyCount != null && countAfterTransfer > effectiveMaxDailyCount) {
             saveAudit(operationType, "ECHEC", "Nombre de virements journalier dépassé", clientId,
                     compteSourceId, compteDestinationId, beneficiaireId, montant);
             throw new IllegalArgumentException("Nombre maximal de virements journaliers atteint");
         }
 
-        int remainingCooldownSeconds = getRemainingCooldownSeconds(clientId);
+        int remainingCooldownSeconds = getRemainingCooldownSeconds(clientId, effectiveMinInterval);
         if (remainingCooldownSeconds > 0) {
             saveAudit(operationType, "ECHEC", "Délai minimal entre virements non respecté", clientId,
                 compteSourceId, compteDestinationId, beneficiaireId, montant);
@@ -613,8 +629,8 @@ public class TransactionServiceImpl implements TransactionService {
         return count == null ? 0L : count;
     }
 
-    private int getRemainingCooldownSeconds(Long clientId) {
-        if (minTransferIntervalSeconds == null || minTransferIntervalSeconds <= 0) {
+    private int getRemainingCooldownSeconds(Long clientId, Integer effectiveMinTransferIntervalSeconds) {
+        if (effectiveMinTransferIntervalSeconds == null || effectiveMinTransferIntervalSeconds <= 0) {
             return 0;
         }
 
@@ -624,8 +640,36 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         long elapsedSeconds = ChronoUnit.SECONDS.between(lastOutgoingTransferAt, LocalDateTime.now());
-        long remainingSeconds = (long) minTransferIntervalSeconds - elapsedSeconds;
+        long remainingSeconds = (long) effectiveMinTransferIntervalSeconds - elapsedSeconds;
         return (int) Math.max(0L, remainingSeconds);
+    }
+
+    private Double resolveMaxSingleTransferAmount(Client client) {
+        if (client != null && client.getCustomMaxSingleTransferAmount() != null) {
+            return client.getCustomMaxSingleTransferAmount();
+        }
+        return maxSingleTransferAmount;
+    }
+
+    private Double resolveMaxDailyTransferTotal(Client client) {
+        if (client != null && client.getCustomMaxDailyTransferTotal() != null) {
+            return client.getCustomMaxDailyTransferTotal();
+        }
+        return maxDailyTransferTotal;
+    }
+
+    private Integer resolveMaxDailyTransferCount(Client client) {
+        if (client != null && client.getCustomMaxDailyTransferCount() != null) {
+            return client.getCustomMaxDailyTransferCount();
+        }
+        return maxDailyTransferCount;
+    }
+
+    private Integer resolveMinTransferIntervalSeconds(Client client) {
+        if (client != null && client.getCustomMinTransferIntervalSeconds() != null) {
+            return client.getCustomMinTransferIntervalSeconds();
+        }
+        return minTransferIntervalSeconds;
     }
 
     private TransferRiskAssessmentDTO assessTransferRisk(Long clientId, Double montant, String operationType, Long beneficiaireId) {

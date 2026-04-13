@@ -50,6 +50,18 @@ public class Client implements Serializable {
     @Column(name = "risk_profile")
     private String riskProfile;
 
+    @Column(name = "custom_max_single_transfer_amount")
+    private Double customMaxSingleTransferAmount;
+
+    @Column(name = "custom_max_daily_transfer_total")
+    private Double customMaxDailyTransferTotal;
+
+    @Column(name = "custom_max_daily_transfer_count")
+    private Integer customMaxDailyTransferCount;
+
+    @Column(name = "custom_min_transfer_interval_seconds")
+    private Integer customMinTransferIntervalSeconds;
+
     @OneToMany(mappedBy = "client")
     private List<Compte> comptes;
 

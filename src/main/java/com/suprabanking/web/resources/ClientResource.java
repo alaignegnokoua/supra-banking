@@ -3,6 +3,7 @@ package com.suprabanking.web.resources;
 import com.suprabanking.services.ClientService;
 import com.suprabanking.services.dto.ClientDTO;
 import com.suprabanking.services.dto.UpdateClientRiskProfileRequest;
+import com.suprabanking.services.dto.UpdateClientTransferLimitsRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +58,18 @@ public class ClientResource {
     public ClientDTO updateRiskProfile(@PathVariable Long id, @Valid @RequestBody UpdateClientRiskProfileRequest request) {
         log.debug("REST request to update Client risk profile id={} profile={}", id, request.getRiskProfile());
         return clientService.updateClientRiskProfile(id, request.getRiskProfile());
+    }
+
+    @PatchMapping("/{id}/transfer-limits")
+    public ClientDTO updateTransferLimits(@PathVariable Long id, @RequestBody UpdateClientTransferLimitsRequest request) {
+        log.debug("REST request to update Client transfer limits id={}", id);
+        return clientService.updateClientTransferLimits(
+                id,
+                request.getMaxSingleTransferAmount(),
+                request.getMaxDailyTransferTotal(),
+                request.getMaxDailyTransferCount(),
+                request.getMinTransferIntervalSeconds()
+        );
     }
 
     @DeleteMapping("/{id}")
