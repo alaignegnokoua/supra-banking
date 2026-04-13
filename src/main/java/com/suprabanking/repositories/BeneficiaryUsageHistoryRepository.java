@@ -55,6 +55,12 @@ public interface BeneficiaryUsageHistoryRepository extends JpaRepository<Benefic
     long countSuccessfulUsagesByBeneficiaire(@Param("beneficiaireId") Long beneficiaireId);
 
     @Query("""
+        SELECT COUNT(h) FROM BeneficiaryUsageHistory h
+        WHERE h.beneficiaire.id = :beneficiaireId
+    """)
+    long countTotalUsagesByBeneficiaire(@Param("beneficiaireId") Long beneficiaireId);
+
+    @Query("""
         SELECT h FROM BeneficiaryUsageHistory h
         WHERE h.beneficiaire.id = :beneficiaireId
         ORDER BY h.usedAt DESC

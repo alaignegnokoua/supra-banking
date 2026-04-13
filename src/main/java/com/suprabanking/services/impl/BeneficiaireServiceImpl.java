@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
@@ -122,6 +123,10 @@ public class BeneficiaireServiceImpl implements BeneficiaireService {
     }
 
     private BeneficiaireDTO toDto(Beneficiaire entity) {
+        long successfulUsages = usageHistoryRepository.countSuccessfulUsagesByBeneficiaire(entity.getId());
+        long totalUsages = usageHistoryRepository.countTotalUsagesByBeneficiaire(entity.getId());
+        int reputationScore = computeReputationScore(entity, successfulUsages, totalUsages);
+
         return BeneficiaireDTO.builder()
                 .id(entity.getId())
                 .nom(entity.getNom())
@@ -132,7 +137,64 @@ public class BeneficiaireServiceImpl implements BeneficiaireService {
                 .createdAt(entity.getCreatedAt())
                 .lastUsedAt(entity.getLastUsedAt())
                 .status(entity.getStatus())
-                .successfulTransfersCount(usageHistoryRepository.countSuccessfulUsagesByBeneficiaire(entity.getId()))
+                .successfulTransfersCount(successfulUsages)
+                .totalUsagesCount(totalUsages)
+                .reputationScore(reputationScore)
+                .reputationLevel(resolveReputationLevel(reputationScore))
+                .reputationRecommendation(resolveReputationRecommendation(reputationScore))
                 .build();
+    }
+
+    private int computeReputationScore(Beneficiaire entity, long successfulUsages, long totalUsages) {
+        int score = 30;
+        score += (int) Math.min(35, successfulUsages * 5);
+        score += (int) Math.min(15, totalUsages * 2);
+
+        LocalDateTime lastUsedAt = entity.getLastUsedAt();
+        if (lastUsedAt != null) {
+            long daysSinceLastUse = ChronoUnit.DAYS.between(lastUsedAt, LocalDateTime.now());
+            if (daysSinceLastUse <= 7) {
+                score += 12;
+            } else if (daysSinceLastUse <= 30) {
+                score += 8;
+            } else if (daysSinceLastUse <= 90) {
+                score += 4;
+            }
+        }
+
+        String status = entity.getStatus() == null ? "ACTIVE" : entity.getStatus().toUpperCase();
+        if ("BLOCKED".equals(status)) {
+            score -= 50;
+        } else if ("PENDING_VERIFICATION".equals(status)) {
+            score -= 20;
+        }
+
+        return Math.max(0, Math.min(100, score));
+    }
+
+    private String resolveReputationLevel(int score) {
+        if (score >= 80) {
+            return "FIABLE";
+        }
+        if (score >= 60) {
+            return "SURVEILLER";
+        }
+        if (score >= 40) {
+            return "RISQUE_MOYEN";
+        }
+        return "RISQUE_ELEVE";
+    }
+
+    private String resolveReputationRecommendation(int score) {
+        if (score >= 80) {
+            return "Bénéficiaire de confiance, faible risque opérationnel";
+        }
+        if (score >= 60) {
+            return "Bénéficiaire correct, surveillance standard recommandée";
+        }
+        if (score >= 40) {
+            return "Vérifier les informations du bénéficiaire avant validation";
+        }
+        return "Risque élevé, validation manuelle recommandée";
     }
 }

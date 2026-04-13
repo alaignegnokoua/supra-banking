@@ -37,7 +37,15 @@ public class BeneficiaireDTO implements Serializable {
     // Usage statistics
     private Long successfulTransfersCount;
 
+    private Long totalUsagesCount;
+
     private LocalDateTime lastUsedAt;
 
     private String status; // ACTIVE, PENDING_VERIFICATION, BLOCKED, etc.
+
+    private Integer reputationScore;
+
+    private String reputationLevel;
+
+    private String reputationRecommendation;
 }
