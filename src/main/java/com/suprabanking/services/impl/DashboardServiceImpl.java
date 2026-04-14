@@ -177,7 +177,7 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private long getUnreadNotificationsCount() {
-        return notificationRepository.countByReadFalse();
+        return notificationRepository.countByStatut("NON_LU");
     }
 
     private long getNotificationsTodayCount() {

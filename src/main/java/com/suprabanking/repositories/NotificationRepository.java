@@ -18,7 +18,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long deleteByClientIdAndStatut(Long clientId, String statut);
     Optional<Notification> findByIdAndClientId(Long id, Long clientId);
 
-    long countByReadFalse();
+    long countByStatut(String statut);
 
     @Query("""
         select count(n)
